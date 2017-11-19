@@ -66,6 +66,9 @@ namespace {
 }
 
 int main() {
+
+	system("compiler.bat");
+	
     static constexpr char* applicationName = "Vulkan Grass Rendering";
     InitializeWindow(640, 480, applicationName);
 
@@ -116,7 +119,7 @@ int main() {
         grassImageMemory
     );
 
-    float planeDim = 15.f;
+    float planeDim = 2.f;
     float halfWidth = planeDim * 0.5f;
     Model* plane = new Model(device, transferCommandPool,
         {
