@@ -4,7 +4,6 @@
 #include <chrono>
 
 #include "Model.h"
-#include "Blades.h"
 
 using namespace std::chrono;
 
@@ -24,7 +23,6 @@ private:
     void* mappedData;
 
     std::vector<Model*> models;
-    std::vector<Blades*> blades;
 
 high_resolution_clock::time_point startTime = high_resolution_clock::now();
 
@@ -34,10 +32,8 @@ public:
     ~Scene();
 
     const std::vector<Model*>& GetModels() const;
-    const std::vector<Blades*>& GetBlades() const;
     
     void AddModel(Model* model);
-    void AddBlades(Blades* blades);
 
     VkBuffer GetTimeBuffer() const;
 

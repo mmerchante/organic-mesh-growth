@@ -162,7 +162,6 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Blades.cpp" />
     <ClCompile Include="BufferUtils.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Device.cpp" />
@@ -177,7 +176,6 @@
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Blades.h" />
     <ClInclude Include="BufferUtils.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Device.h" />
@@ -193,16 +191,9 @@
     <ClInclude Include="Window.h" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="CMakeLists.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="shaders\compute.comp" />
     <None Include="shaders\graphics.frag" />
     <None Include="shaders\graphics.vert" />
-    <None Include="shaders\grass.frag" />
-    <None Include="shaders\grass.tesc" />
-    <None Include="shaders\grass.tese" />
-    <None Include="shaders\grass.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

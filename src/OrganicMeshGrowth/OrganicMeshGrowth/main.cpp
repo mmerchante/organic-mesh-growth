@@ -69,7 +69,7 @@ int main() {
 
 	system("compiler.bat");
 	
-    static constexpr char* applicationName = "Vulkan Grass Rendering";
+    static constexpr char* applicationName = "Organic Mesh Growth";
     InitializeWindow(640, 480, applicationName);
 
     unsigned int glfwExtensionCount = 0;
@@ -131,14 +131,11 @@ int main() {
         { 0, 1, 2, 2, 3, 0 }
     );
     plane->SetTexture(grassImage);
-    
-    Blades* blades = new Blades(device, transferCommandPool, planeDim);
 
     vkDestroyCommandPool(device->GetVkDevice(), transferCommandPool, nullptr);
 
     Scene* scene = new Scene(device);
     scene->AddModel(plane);
-    scene->AddBlades(blades);
 
     renderer = new Renderer(device, swapChain, scene, camera);
 
@@ -159,7 +156,6 @@ int main() {
 
     delete scene;
     delete plane;
-    delete blades;
     delete camera;
     delete renderer;
     delete swapChain;

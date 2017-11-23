@@ -18,9 +18,6 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Blades.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="BufferUtils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -56,9 +53,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Blades.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="BufferUtils.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -100,17 +94,8 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="CMakeLists.txt">
-      <Filter>Source Files</Filter>
-    </Text>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="shaders\compute.comp" />
     <None Include="shaders\graphics.frag" />
     <None Include="shaders\graphics.vert" />
-    <None Include="shaders\grass.frag" />
-    <None Include="shaders\grass.tesc" />
-    <None Include="shaders\grass.tese" />
-    <None Include="shaders\grass.vert" />
   </ItemGroup>
 </Project>

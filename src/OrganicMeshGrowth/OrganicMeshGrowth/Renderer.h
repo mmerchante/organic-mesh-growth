@@ -24,12 +24,10 @@ public:
 
     void CreateCameraDescriptorSet();
     void CreateModelDescriptorSets();
-    void CreateGrassDescriptorSets();
     void CreateTimeDescriptorSet();
     void CreateComputeDescriptorSets();
 
     void CreateGraphicsPipeline();
-    void CreateGrassPipeline();
     void CreateComputePipeline();
 
     void CreateFrameResources();
@@ -64,11 +62,9 @@ private:
     VkDescriptorSet timeDescriptorSet;
 
     VkPipelineLayout graphicsPipelineLayout;
-    VkPipelineLayout grassPipelineLayout;
     VkPipelineLayout computePipelineLayout;
 
     VkPipeline graphicsPipeline;
-    VkPipeline grassPipeline;
     VkPipeline computePipeline;
 
     std::vector<VkImageView> imageViews;

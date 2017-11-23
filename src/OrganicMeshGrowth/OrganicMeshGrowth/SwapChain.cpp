@@ -153,6 +153,7 @@ void SwapChain::Create() {
 
 void SwapChain::Destroy() {
     vkDestroySwapchainKHR(device->GetVkDevice(), vkSwapChain, nullptr);
+	vkDestroySurfaceKHR(device->GetInstance()->GetVkInstance(), vkSurface, nullptr);
 }
 
 VkSwapchainKHR SwapChain::GetVkSwapChain() const {
