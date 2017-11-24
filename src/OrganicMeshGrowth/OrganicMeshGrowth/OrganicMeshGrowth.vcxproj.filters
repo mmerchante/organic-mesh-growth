@@ -51,6 +51,9 @@
     <ClCompile Include="Window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Texture3D.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BufferUtils.h">
@@ -91,6 +94,9 @@
     </ClInclude>
     <ClInclude Include="Window.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Texture3D.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

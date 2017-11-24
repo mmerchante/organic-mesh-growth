@@ -1,8 +1,9 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-#define WORKGROUP_SIZE 32
-layout(local_size_x = WORKGROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
+#define WORKGROUP_SIZE 8
+
+layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = WORKGROUP_SIZE) in;
 
 layout(set = 0, binding = 0) uniform CameraBufferObject {
     mat4 view;

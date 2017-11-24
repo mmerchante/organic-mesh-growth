@@ -4,6 +4,7 @@
 #include "Vertex.h"
 #include "Camera.h"
 #include "Image.h"
+#include "Texture3D.h"
 
 static constexpr unsigned int WORKGROUP_SIZE = 32;
 
@@ -191,10 +192,26 @@ void Renderer::CreateTimeDescriptorSetLayout() {
     }
 }
 
-void Renderer::CreateComputeDescriptorSetLayout() {
-    // TODO: Create the descriptor set layout for the compute pipeline
-    // Remember this is like a class definition stating why types of information
-    // will be stored at each binding
+void Renderer::CreateComputeDescriptorSetLayout() 
+{
+	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+	samplerLayoutBinding.binding = 0;
+	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	samplerLayoutBinding.descriptorCount = 1;
+	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	samplerLayoutBinding.pImmutableSamplers = nullptr;
+
+	std::vector<VkDescriptorSetLayoutBinding> bindings = { samplerLayoutBinding };
+
+	// Create the descriptor set layout
+	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+	layoutInfo.pBindings = bindings.data();
+
+	if (vkCreateDescriptorSetLayout(logicalDevice, &layoutInfo, nullptr, &computeDescriptorSetLayout) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create compute shader descriptor set layout");
+	}
 }
 
 void Renderer::CreateDescriptorPool() {
@@ -209,10 +226,11 @@ void Renderer::CreateDescriptorPool() {
         // Models
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , static_cast<uint32_t>(scene->GetModels().size()) },
 
-        // Time (compute)
+        // Time
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , 1 },
 
-        // TODO: Add any additional types and counts of descriptors you will need to allocate
+		// 3D Texture 
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 } 
     };
 
     VkDescriptorPoolCreateInfo poolInfo = {};
@@ -349,8 +367,74 @@ void Renderer::CreateTimeDescriptorSet() {
     vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
-void Renderer::CreateComputeDescriptorSets() {
-    // TODO
+void Renderer::CreateComputeDescriptorSets() 
+{
+	// Describe the desciptor set
+	VkDescriptorSetLayout layouts[] = { computeDescriptorSetLayout };
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = layouts;
+
+	// Allocate descriptor sets
+	if (vkAllocateDescriptorSets(logicalDevice, &allocInfo, &computeDescriptorSet) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to allocate compute descriptor set");
+	}
+	
+	std::vector<VkWriteDescriptorSet> descriptorWrites(1);
+
+	VkSamplerCreateInfo samplerInfo = {};
+	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+
+	// Interpolation of texels that are magnified or minified
+	samplerInfo.magFilter = VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+	// Addressing mode
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+	// Anisotropic filtering
+	samplerInfo.anisotropyEnable = VK_FALSE;
+	samplerInfo.maxAnisotropy = 1;
+
+	// Border color
+	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+
+	// Choose coordinate system for addressing texels --> [0, 1) here
+	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+
+	// Comparison function used for filtering operations
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+	// Mipmapping
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+	samplerInfo.mipLodBias = 0.0f;
+	samplerInfo.minLod = 0.0f;
+	samplerInfo.maxLod = 0.0f;
+
+	sceneSDF = new Texture3D(device, 32, 32, 32, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo);
+
+	// Bind image and sampler resources to the descriptor
+	VkDescriptorImageInfo imageInfo = {};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	imageInfo.imageView = sceneSDF->GetImageView();
+	imageInfo.sampler = sceneSDF->GetSampler();
+
+	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[0].dstSet = computeDescriptorSet;
+	descriptorWrites[0].dstBinding = 0;
+	descriptorWrites[0].dstArrayElement = 0;
+	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	descriptorWrites[0].descriptorCount = 1;
+	descriptorWrites[0].pImageInfo = &imageInfo;
+
+	// Update descriptor sets
+	vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
 void Renderer::CreateGraphicsPipeline() {
@@ -522,8 +606,7 @@ void Renderer::CreateComputePipeline() {
     computeShaderStageInfo.module = computeShaderModule;
     computeShaderStageInfo.pName = "main";
 
-    // TODO: Add the compute dsecriptor set layout you create to this list
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { cameraDescriptorSetLayout, timeDescriptorSetLayout };
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { cameraDescriptorSetLayout, timeDescriptorSetLayout, computeDescriptorSetLayout };
 
     // Create pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
@@ -686,7 +769,10 @@ void Renderer::RecordComputeCommandBuffer() {
     // Bind descriptor set for time uniforms
     vkCmdBindDescriptorSets(computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 1, 1, &timeDescriptorSet, 0, nullptr);
 
-    // TODO: Bind descriptor sets and dispatch compute shader
+	// Bind descriptor set for 3D texture
+	vkCmdBindDescriptorSets(computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 2, 1, &computeDescriptorSet, 0, nullptr);
+
+	vkCmdDispatch(computeCommandBuffer, 4, 4, 4);
 
     // ~ End recording ~
     if (vkEndCommandBuffer(computeCommandBuffer) != VK_SUCCESS) {
@@ -814,8 +900,6 @@ void Renderer::Frame() {
 Renderer::~Renderer() {
     vkDeviceWaitIdle(logicalDevice);
 
-    // TODO: destroy any resources created
-
     vkFreeCommandBuffers(logicalDevice, graphicsCommandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
     vkFreeCommandBuffers(logicalDevice, computeCommandPool, 1, &computeCommandBuffer);
     
@@ -828,6 +912,7 @@ Renderer::~Renderer() {
     vkDestroyDescriptorSetLayout(logicalDevice, cameraDescriptorSetLayout, nullptr);
     vkDestroyDescriptorSetLayout(logicalDevice, modelDescriptorSetLayout, nullptr);
     vkDestroyDescriptorSetLayout(logicalDevice, timeDescriptorSetLayout, nullptr);
+	vkDestroyDescriptorSetLayout(logicalDevice, computeDescriptorSetLayout, nullptr);
 
     vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
 
@@ -835,4 +920,6 @@ Renderer::~Renderer() {
     DestroyFrameResources();
     vkDestroyCommandPool(logicalDevice, computeCommandPool, nullptr);
     vkDestroyCommandPool(logicalDevice, graphicsCommandPool, nullptr);
+
+	delete sceneSDF;
 }

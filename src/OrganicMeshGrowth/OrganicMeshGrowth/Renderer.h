@@ -5,6 +5,8 @@
 #include "Scene.h"
 #include "Camera.h"
 
+class Texture3D;
+
 class Renderer {
 public:
     Renderer() = delete;
@@ -46,6 +48,8 @@ private:
     Scene* scene;
     Camera* camera;
 
+	Texture3D* sceneSDF;
+
     VkCommandPool graphicsCommandPool;
     VkCommandPool computeCommandPool;
 
@@ -53,13 +57,15 @@ private:
 
     VkDescriptorSetLayout cameraDescriptorSetLayout;
     VkDescriptorSetLayout modelDescriptorSetLayout;
-    VkDescriptorSetLayout timeDescriptorSetLayout;
+	VkDescriptorSetLayout timeDescriptorSetLayout;
+    VkDescriptorSetLayout computeDescriptorSetLayout;
     
     VkDescriptorPool descriptorPool;
 
     VkDescriptorSet cameraDescriptorSet;
     std::vector<VkDescriptorSet> modelDescriptorSets;
     VkDescriptorSet timeDescriptorSet;
+	VkDescriptorSet computeDescriptorSet;
 
     VkPipelineLayout graphicsPipelineLayout;
     VkPipelineLayout computePipelineLayout;
