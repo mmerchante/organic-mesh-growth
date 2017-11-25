@@ -157,7 +157,14 @@ void Renderer::CreateModelDescriptorSetLayout() {
     samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     samplerLayoutBinding.pImmutableSamplers = nullptr;
 
-    std::vector<VkDescriptorSetLayoutBinding> bindings = { uboLayoutBinding, samplerLayoutBinding };
+	VkDescriptorSetLayoutBinding sdfLayoutBinding = {};
+	sdfLayoutBinding.binding = 2;
+	sdfLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	sdfLayoutBinding.descriptorCount = 1;
+	sdfLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	sdfLayoutBinding.pImmutableSamplers = nullptr;
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings = { uboLayoutBinding, samplerLayoutBinding, sdfLayoutBinding };
 
     // Create the descriptor set layout
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
@@ -221,7 +228,7 @@ void Renderer::CreateDescriptorPool() {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , 1},
 
         // Models
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER , static_cast<uint32_t>(scene->GetModels().size()) },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER , 2 * static_cast<uint32_t>(scene->GetModels().size()) },
 
         // Models
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , static_cast<uint32_t>(scene->GetModels().size()) },
@@ -295,7 +302,7 @@ void Renderer::CreateModelDescriptorSets() {
         throw std::runtime_error("Failed to allocate descriptor set");
     }
 
-    std::vector<VkWriteDescriptorSet> descriptorWrites(2 * modelDescriptorSets.size());
+    std::vector<VkWriteDescriptorSet> descriptorWrites(3 * modelDescriptorSets.size());
 
     for (uint32_t i = 0; i < scene->GetModels().size(); ++i) {
         VkDescriptorBufferInfo modelBufferInfo = {};
@@ -309,23 +316,37 @@ void Renderer::CreateModelDescriptorSets() {
         imageInfo.imageView = scene->GetModels()[i]->GetTextureView();
         imageInfo.sampler = scene->GetModels()[i]->GetTextureSampler();
 
-        descriptorWrites[2 * i + 0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[2 * i + 0].dstSet = modelDescriptorSets[i];
-        descriptorWrites[2 * i + 0].dstBinding = 0;
-        descriptorWrites[2 * i + 0].dstArrayElement = 0;
-        descriptorWrites[2 * i + 0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[2 * i + 0].descriptorCount = 1;
-        descriptorWrites[2 * i + 0].pBufferInfo = &modelBufferInfo;
-        descriptorWrites[2 * i + 0].pImageInfo = nullptr;
-        descriptorWrites[2 * i + 0].pTexelBufferView = nullptr;
+        descriptorWrites[3 * i + 0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[3 * i + 0].dstSet = modelDescriptorSets[i];
+        descriptorWrites[3 * i + 0].dstBinding = 0;
+        descriptorWrites[3 * i + 0].dstArrayElement = 0;
+        descriptorWrites[3 * i + 0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[3 * i + 0].descriptorCount = 1;
+        descriptorWrites[3 * i + 0].pBufferInfo = &modelBufferInfo;
+        descriptorWrites[3 * i + 0].pImageInfo = nullptr;
+        descriptorWrites[3 * i + 0].pTexelBufferView = nullptr;
 
-        descriptorWrites[2 * i + 1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[2 * i + 1].dstSet = modelDescriptorSets[i];
-        descriptorWrites[2 * i + 1].dstBinding = 1;
-        descriptorWrites[2 * i + 1].dstArrayElement = 0;
-        descriptorWrites[2 * i + 1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[2 * i + 1].descriptorCount = 1;
-        descriptorWrites[2 * i + 1].pImageInfo = &imageInfo;
+        descriptorWrites[3 * i + 1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[3 * i + 1].dstSet = modelDescriptorSets[i];
+        descriptorWrites[3 * i + 1].dstBinding = 1;
+        descriptorWrites[3 * i + 1].dstArrayElement = 0;
+        descriptorWrites[3 * i + 1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[3 * i + 1].descriptorCount = 1;
+        descriptorWrites[3 * i + 1].pImageInfo = &imageInfo;
+
+		// Bind image and sampler resources to the descriptor
+		VkDescriptorImageInfo sdfImageInfo = {};
+		sdfImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		sdfImageInfo.imageView = scene->GetSceneSDF()->GetImageView();
+		sdfImageInfo.sampler = scene->GetSceneSDF()->GetSampler();
+
+		descriptorWrites[3 * i + 2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[3 * i + 2].dstSet = modelDescriptorSets[i];
+		descriptorWrites[3 * i + 2].dstBinding = 2;
+		descriptorWrites[3 * i + 2].dstArrayElement = 0;
+		descriptorWrites[3 * i + 2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[3 * i + 2].descriptorCount = 1;
+		descriptorWrites[3 * i + 2].pImageInfo = &sdfImageInfo;
     }
 
     // Update descriptor sets
@@ -384,46 +405,11 @@ void Renderer::CreateComputeDescriptorSets()
 	
 	std::vector<VkWriteDescriptorSet> descriptorWrites(1);
 
-	VkSamplerCreateInfo samplerInfo = {};
-	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-
-	// Interpolation of texels that are magnified or minified
-	samplerInfo.magFilter = VK_FILTER_LINEAR;
-	samplerInfo.minFilter = VK_FILTER_LINEAR;
-
-	// Addressing mode
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-
-	// Anisotropic filtering
-	samplerInfo.anisotropyEnable = VK_FALSE;
-	samplerInfo.maxAnisotropy = 1;
-
-	// Border color
-	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-
-	// Choose coordinate system for addressing texels --> [0, 1) here
-	samplerInfo.unnormalizedCoordinates = VK_FALSE;
-
-	// Comparison function used for filtering operations
-	samplerInfo.compareEnable = VK_FALSE;
-	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
-	// Mipmapping
-	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-	samplerInfo.mipLodBias = 0.0f;
-	samplerInfo.minLod = 0.0f;
-	samplerInfo.maxLod = 0.0f;
-
-	sceneSDF = new Texture3D(device, 32, 32, 32, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo);
-
 	// Bind image and sampler resources to the descriptor
 	VkDescriptorImageInfo imageInfo = {};
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	imageInfo.imageView = sceneSDF->GetImageView();
-	imageInfo.sampler = sceneSDF->GetSampler();
+	imageInfo.imageView = scene->GetSceneSDF()->GetImageView();
+	imageInfo.sampler = scene->GetSceneSDF()->GetSampler();
 
 	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptorWrites[0].dstSet = computeDescriptorSet;
@@ -772,7 +758,7 @@ void Renderer::RecordComputeCommandBuffer() {
 	// Bind descriptor set for 3D texture
 	vkCmdBindDescriptorSets(computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 2, 1, &computeDescriptorSet, 0, nullptr);
 
-	vkCmdDispatch(computeCommandBuffer, 4, 4, 4);
+	vkCmdDispatch(computeCommandBuffer, 32, 32, 32);
 
     // ~ End recording ~
     if (vkEndCommandBuffer(computeCommandBuffer) != VK_SUCCESS) {
@@ -920,6 +906,4 @@ Renderer::~Renderer() {
     DestroyFrameResources();
     vkDestroyCommandPool(logicalDevice, computeCommandPool, nullptr);
     vkDestroyCommandPool(logicalDevice, graphicsCommandPool, nullptr);
-
-	delete sceneSDF;
 }

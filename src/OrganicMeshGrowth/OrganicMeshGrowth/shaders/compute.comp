@@ -21,10 +21,10 @@ void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
     vec3 nPos = (vec3(coord) / vec3(gl_WorkGroupSize * gl_NumWorkGroups)) * 2.0 - 1.0;
-	float sdf = length(nPos) - .25;
+	float sdf = length(nPos) - .5 * (sin(totalTime) * .5 + .75);
 
 	imageStore(MeshSDF, coord, vec4(sdf));
-	sdf = imageLoad(MeshSDF, coord).x;
-	sdf += .5f;
-	imageStore(MeshSDF, coord, vec4(sdf));
+	//sdf = imageLoad(MeshSDF, coord).x;
+	//sdf += .5f;
+	//imageStore(MeshSDF, coord, vec4(sdf));
 }

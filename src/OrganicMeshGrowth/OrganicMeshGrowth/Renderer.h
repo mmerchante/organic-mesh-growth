@@ -47,9 +47,7 @@ private:
     SwapChain* swapChain;
     Scene* scene;
     Camera* camera;
-
-	Texture3D* sceneSDF;
-
+	
     VkCommandPool graphicsCommandPool;
     VkCommandPool computeCommandPool;
 

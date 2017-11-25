@@ -136,6 +136,7 @@ int main() {
 
     Scene* scene = new Scene(device);
     scene->AddModel(plane);
+	scene->CreateSceneSDF();
 
     renderer = new Renderer(device, swapChain, scene, camera);
 

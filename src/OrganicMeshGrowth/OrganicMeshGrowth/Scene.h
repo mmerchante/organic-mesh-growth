@@ -4,6 +4,7 @@
 #include <chrono>
 
 #include "Model.h"
+#include "Texture3D.h"
 
 using namespace std::chrono;
 
@@ -19,6 +20,7 @@ private:
     VkBuffer timeBuffer;
     VkDeviceMemory timeBufferMemory;
     Time time;
+	Texture3D* sceneSDF;
     
     void* mappedData;
 
@@ -36,6 +38,9 @@ public:
     void AddModel(Model* model);
 
     VkBuffer GetTimeBuffer() const;
+
+	Texture3D* GetSceneSDF();
+	void CreateSceneSDF();
 
     void UpdateTime();
 };
