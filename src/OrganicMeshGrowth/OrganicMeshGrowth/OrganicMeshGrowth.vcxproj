@@ -193,9 +193,10 @@
     <ClInclude Include="Window.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\compute.comp" />
+    <None Include="shaders\generator.comp" />
     <None Include="shaders\graphics.frag" />
     <None Include="shaders\graphics.vert" />
+    <None Include="shaders\kernel.comp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

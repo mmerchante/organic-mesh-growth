@@ -60,17 +60,18 @@ void Scene::CreateSceneSDF()
 	samplerInfo.minLod = 0.0f;
 	samplerInfo.maxLod = 0.0f;
 
-	sceneSDF = new Texture3D(device, 256, 256, 256, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo);
+	for (int i = 0; i < 2; ++i) {
+		sceneSDF.push_back(new Texture3D(device, 256, 256, 256, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo));
+	}
 }
 
 VkBuffer Scene::GetTimeBuffer() const {
     return timeBuffer;
 }
 
-Texture3D * Scene::GetSceneSDF()
+Texture3D * Scene::GetSceneSDF(int index)
 {
-	return sceneSDF;
+	return sceneSDF[index];
 }
 
 Scene::~Scene() {
@@ -78,5 +79,6 @@ Scene::~Scene() {
     vkDestroyBuffer(device->GetVkDevice(), timeBuffer, nullptr);
     vkFreeMemory(device->GetVkDevice(), timeBufferMemory, nullptr);
 
-	delete sceneSDF;
+	for (Texture3D* t : sceneSDF)
+		delete t;
 }

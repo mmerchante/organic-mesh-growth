@@ -20,25 +20,28 @@ public:
     void CreateCameraDescriptorSetLayout();
     void CreateModelDescriptorSetLayout();
     void CreateTimeDescriptorSetLayout();
-    void CreateComputeDescriptorSetLayout();
+    void CreateSceneSDFDescriptorSetLayout();
 
     void CreateDescriptorPool();
 
     void CreateCameraDescriptorSet();
-    void CreateModelDescriptorSets();
+    void CreateModelDescriptorSets(bool primary);
     void CreateTimeDescriptorSet();
-    void CreateComputeDescriptorSets();
+    void CreateSceneSDFDescriptorSet();
 
-    void CreateGraphicsPipeline();
-    void CreateComputePipeline();
+    void CreateRaymarchingPipeline();
+    void CreateKernelComputePipeline();
+	void CreateGeneratorComputePipeline();
 
     void CreateFrameResources();
     void DestroyFrameResources();
     void RecreateFrameResources();
 
-    void RecordCommandBuffers();
-    void RecordComputeCommandBuffer();
+    void RecordCommandBuffers(bool primary);
+    void RecordKernelComputeCommandBuffer();
+	void RecordGeneratorComputeCommandBuffer();
 
+	void GenerateSceneSDF();
     void Frame();
 
 private:
@@ -47,36 +50,49 @@ private:
     SwapChain* swapChain;
     Scene* scene;
     Camera* camera;
+
+	int currentFrameIndex;
 	
-    VkCommandPool graphicsCommandPool;
+    VkCommandPool raymarchingCommandPool;
     VkCommandPool computeCommandPool;
 
     VkRenderPass renderPass;
 
+	VkDescriptorPool descriptorPool;
+
     VkDescriptorSetLayout cameraDescriptorSetLayout;
     VkDescriptorSetLayout modelDescriptorSetLayout;
 	VkDescriptorSetLayout timeDescriptorSetLayout;
-    VkDescriptorSetLayout computeDescriptorSetLayout;
-    
-    VkDescriptorPool descriptorPool;
+    VkDescriptorSetLayout sceneSDFDescriptorSetLayout;
 
     VkDescriptorSet cameraDescriptorSet;
-    std::vector<VkDescriptorSet> modelDescriptorSets;
     VkDescriptorSet timeDescriptorSet;
-	VkDescriptorSet computeDescriptorSet;
+	VkDescriptorSet primarySceneSDFDescriptorSet;
+	VkDescriptorSet secondarySceneSDFDescriptorSet;
 
-    VkPipelineLayout graphicsPipelineLayout;
-    VkPipelineLayout computePipelineLayout;
+    std::vector<VkDescriptorSet> primaryModelDescriptorSets;
+	std::vector<VkDescriptorSet> secondaryModelDescriptorSets;
 
-    VkPipeline graphicsPipeline;
-    VkPipeline computePipeline;
+    VkPipelineLayout raymarchingPipelineLayout;
+    VkPipelineLayout kernelComputePipelineLayout;
+	VkPipelineLayout generatorComputePipelineLayout;
 
-    std::vector<VkImageView> imageViews;
+    VkPipeline raymarchingPipeline;
+    VkPipeline kernelComputePipeline;
+	VkPipeline generatorComputePipeline;
+
     VkImage depthImage;
     VkDeviceMemory depthImageMemory;
     VkImageView depthImageView;
+
+    std::vector<VkImageView> imageViews;
     std::vector<VkFramebuffer> framebuffers;
 
-    std::vector<VkCommandBuffer> commandBuffers;
-    VkCommandBuffer computeCommandBuffer;
+	VkCommandBuffer generatorCommandBuffer;
+
+    VkCommandBuffer primaryKernelCommandBuffer;
+	VkCommandBuffer secondaryKernelCommandBuffer;
+    
+	std::vector<VkCommandBuffer> primaryCommandBuffers;
+	std::vector<VkCommandBuffer> secondaryCommandBuffers;
 };

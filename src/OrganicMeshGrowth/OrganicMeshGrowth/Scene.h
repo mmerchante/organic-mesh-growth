@@ -20,7 +20,7 @@ private:
     VkBuffer timeBuffer;
     VkDeviceMemory timeBufferMemory;
     Time time;
-	Texture3D* sceneSDF;
+	std::vector<Texture3D*> sceneSDF;
     
     void* mappedData;
 
@@ -39,7 +39,7 @@ public:
 
     VkBuffer GetTimeBuffer() const;
 
-	Texture3D* GetSceneSDF();
+	Texture3D* GetSceneSDF(int index);
 	void CreateSceneSDF();
 
     void UpdateTime();

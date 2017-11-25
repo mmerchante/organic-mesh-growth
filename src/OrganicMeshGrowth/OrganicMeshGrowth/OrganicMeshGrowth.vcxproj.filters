@@ -100,8 +100,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\compute.comp" />
     <None Include="shaders\graphics.frag" />
     <None Include="shaders\graphics.vert" />
+    <None Include="shaders\generator.comp" />
+    <None Include="shaders\kernel.comp" />
   </ItemGroup>
 </Project>

@@ -1,7 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-#define EPSILON 0.01
+#define EPSILON 0.001
 
 layout(set = 1, binding = 1) uniform sampler2D texSampler;
 layout(set = 1, binding = 2) uniform sampler3D sdfSampler;
@@ -28,13 +28,8 @@ float fBox(vec3 p, vec3 b) {
 
 float sdf(vec3 pos)
 {
-	pos *= .2;
-	pos = fract(abs(pos));
-	//pos = mod(pos, vec3(10.0)) - 0.5*vec3(10.0);
-	//float dist = fBox(pos, vec3(1.0, 1.0, 3.0));
-
+	pos += .5;
 	float dist = texture(sdfSampler, pos).x;
-
 	return dist;
 }
 
@@ -51,12 +46,17 @@ vec3 sdfNormal(vec3 pos, float epsilon)
 
 vec3 sdf_viz(vec3 rO, vec3 rD)
 {
+	rO.y += .5;
     float t = -rO.y / rD.y;
         
     if(t < 0.0)
         return vec3(0.0);
     
     vec3 p = rO + rD * t;    
+
+	if(abs(p.x) > .5 || abs(p.z) > .5)
+		return vec3(0.0);
+
     float d = sdf(p) * 3.0;
     return vec3(smoothstep(.1, .2, mod(d, 1.0)) * .5);
 }
@@ -66,17 +66,15 @@ void main()
 {
 	float t = 0.0;
 	bool hit = false;
-	float steps = 0.0;
-
 
 	//outColor = vec4(sdf_viz(rayOrigin, rayDirection), 1.0);
 
-	int maxSteps = 100;
-
-	for(int i = 0; i < maxSteps; ++i)
+	for(int i = 0; i < 150; ++i)
 	{
 		vec3 pos = rayOrigin + rayDirection * t;
-		float dist = sdf(pos);
+		float dist = sdf(pos) * .05;
+
+		t += dist;
 
 		if(dist < EPSILON)
 		{
@@ -84,8 +82,6 @@ void main()
 			break;
 		}
 
-		t += dist;
-		steps += 1.0 / float(maxSteps);
 	}
 
 	if(hit)
