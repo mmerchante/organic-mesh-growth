@@ -19,7 +19,6 @@ float fBox(vec3 p, vec3 b) {
 	return length(max(d, vec3(0))) + vmax(min(d, vec3(0)));
 }
 
-
 // All SDFS from iq, http://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
 // But they are tweaked for their threejs equivalents
 float sdSphere( vec3 p, float r )
@@ -200,11 +199,78 @@ float minionBaseSDF(vec3 point)
 	return dist;
 }
 
+// A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
+uint hash( uint x ) {
+    x += ( x << 10u );
+    x ^= ( x >>  6u );
+    x += ( x <<  3u );
+    x ^= ( x >> 11u );
+    x += ( x << 15u );
+    return x;
+}
+
+
+// Construct a float with half-open range [0:1] using low 23 bits.
+// All zeroes yields 0.0, all ones yields the next smallest representable value below 1.0.
+float floatConstruct( uint m ) {
+    const uint ieeeMantissa = 0x007FFFFFu; // binary32 mantissa bitmask
+    const uint ieeeOne      = 0x3F800000u; // 1.0 in IEEE binary32
+
+    m &= ieeeMantissa;                     // Keep only mantissa bits (fractional part)
+    m |= ieeeOne;                          // Add fractional part to 1.0
+
+    float  f = uintBitsToFloat( m );       // Range [1:2]
+    return f - 1.0;                        // Range [0:1]
+}
+
+float random(inout uint seed)
+{
+	seed = hash(seed);
+	return floatConstruct(seed);
+}
+
+vec2 hash2( vec2 p ) 
+{
+    const vec2 k = vec2( 0.3183099, 0.23678794 );
+    p = p*k + k.yx;
+    return fract( 13.0 * k * fract(p.x*p.y*(p.x+p.y)));
+}
+
+// iq
+mat3x3 rotationAxisAngle( const vec3 v, float a )
+{
+    const float si = sin( a );
+    const float co = cos( a );
+    const float ic = 1.0f - co;
+
+    return mat3x3( v.x*v.x*ic + co,       v.y*v.x*ic - si*v.z,    v.z*v.x*ic + si*v.y,
+                   v.x*v.y*ic + si*v.z,   v.y*v.y*ic + co,        v.z*v.y*ic - si*v.x,
+                   v.x*v.z*ic - si*v.y,   v.y*v.z*ic + si*v.x,    v.z*v.z*ic + co );
+}
+
+float randomCubes(vec3 p)
+{
+	float d = 1000.0;
+
+	uint seed = 14041956 + 73123;
+
+	for(int i = 0; i < 32; i++)
+	{
+		vec3 offset = vec3(random(seed), random(seed), random(seed)) - .5;
+		vec3 size = vec3(random(seed), random(seed), random(seed)) * .2;
+		mat3x3 rot = rotationAxisAngle(normalize(vec3(random(seed), random(seed), random(seed))), random(seed) * 3.14);
+		//p = rot * p;
+		d = min(d, fBox(p - offset, size));
+	}	
+
+	return d;
+}
+
 void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
     vec3 nPos = (vec3(coord) / vec3(gl_WorkGroupSize * gl_NumWorkGroups)) * 2.0 - 1.0;
-	float sdf = minionBaseSDF(nPos);//fBox(nPos, vec3(0.35));
+	float sdf = randomCubes(nPos);// minionBaseSDF(nPos);//fBox(nPos, vec3(0.35));
 
 	imageStore(MeshSDF, coord, vec4(sdf));
 }

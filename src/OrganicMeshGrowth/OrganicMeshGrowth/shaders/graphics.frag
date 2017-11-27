@@ -2,7 +2,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 #define MAX_DISTANCE 1.7320508
-#define EPSILON 0.001
+#define EPSILON 0.002
 
 layout(set = 0, binding = 0) uniform CameraBufferObject {
     mat4 view;
@@ -64,9 +64,30 @@ vec3 sdf_viz(vec3 rO, vec3 rD)
 	if(abs(p.x) > .5 || abs(p.z) > .5)
 		return CLEAR_COLOR;
 
-	p.y -= .5;
-    float d = sdf(p) * 3.0;
+	p.y += .5;
+    float d = sdf(p) * 24.0;
     return mix(CLEAR_COLOR, CLEAR_COLOR * 2.0, (smoothstep(.1, .2, mod(d, 1.0)) * .5));
+}
+
+#define AO_ITERATIONS 15
+#define AO_DELTA .0075
+#define AO_DECAY .9
+#define AO_INTENSITY 1.0
+
+float evaluateAmbientOcclusion(vec3 point, vec3 normal)
+{
+	float ao = 0.0;
+	float delta = AO_DELTA;
+	float decay = 1.0;
+
+	for(int i = 0; i < AO_ITERATIONS; i++)
+	{
+		float d = float(i) * delta;
+		decay *= AO_DECAY;
+		ao += (d - max(0.0, sdf(point + normal * d))) / decay;
+	}
+
+	return clamp(1.0 - ao * AO_INTENSITY, 0.0, 1.0);
 }
 
 void main() 
@@ -74,15 +95,14 @@ void main()
 	vec3 rayDirection = normalize(rayOrigin - camera.position);
 	float t = 0.0;
 	bool hit = false;
+	float dist = 100.0;
 
-	//outColor = vec4(sdf_viz(rayOrigin, rayDirection), 1.0);
-
-	for(int i = 0; i < 750; ++i)
+	for(int i = 0; i < 1000.0; ++i)
 	{
 		vec3 pos = rayOrigin + rayDirection * t;
-		float dist = sdf(pos);// min(0.05, sdf(pos) * .05);
+		dist = sdf(pos);// min(0.05, sdf(pos) * .05);
 
-		t += .001;
+		t += clamp(dist * .05, 0.0, .001);
 
 		if(dist < EPSILON)
 		{
@@ -100,9 +120,9 @@ void main()
 		vec3 pos = rayOrigin + rayDirection * t;
 		vec3 normal = sdfNormal(pos, EPSILON);
 
+		// Sphere lit
 		vec3 ssNormal = (camera.view * vec4(normal, 0.0)).xyz * vec3(1.0, -1.0, 1.0) * .5 + .5;
-		//outColor = vec4(dot(normal, vec3(.577))) * .75 + .25;
-		outColor = texture(texSampler, ssNormal.xy);
+		outColor = texture(texSampler, ssNormal.xy + length(pos) * .1);
 	}
 	else
 	{
