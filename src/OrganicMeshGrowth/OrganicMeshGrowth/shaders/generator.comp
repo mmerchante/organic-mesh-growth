@@ -6,11 +6,24 @@
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = WORKGROUP_SIZE) in;
 layout(set = 0, binding = 0, r32f) coherent uniform image3D MeshSDF;
 
+float vmax(vec3 v) {
+	return max(max(v.x, v.y), v.z);
+}
+
+float vmin(vec3 v) {
+	return min(min(v.x, v.y), v.z);
+}
+
+float fBox(vec3 p, vec3 b) {
+	vec3 d = abs(p) - b;
+	return length(max(d, vec3(0))) + vmax(min(d, vec3(0)));
+}
+
 void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
     vec3 nPos = (vec3(coord) / vec3(gl_WorkGroupSize * gl_NumWorkGroups)) * 2.0 - 1.0;
-	float sdf = length(nPos) - .35;
+	float sdf = fBox(nPos, vec3(0.35));
 
 	imageStore(MeshSDF, coord, vec4(sdf));
 }

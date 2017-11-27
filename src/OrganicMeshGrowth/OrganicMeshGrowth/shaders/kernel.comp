@@ -22,14 +22,24 @@ void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
 
-	ivec3 shiftedCoord = coord;
-	shiftedCoord.x = (shiftedCoord.x + 1) % int(gl_WorkGroupSize * gl_NumWorkGroups).x;
-    
-	vec3 nPos = (vec3(coord) / vec3(gl_WorkGroupSize * gl_NumWorkGroups)) * 2.0 - 1.0;
-	float sdf = length(nPos) - .5 * (sin(totalTime) * .5 + .75);
+	ivec3 minBounds = clamp(coord - 1, ivec3(0), ivec3(255));
+	ivec3 maxBounds = clamp(coord + 1, ivec3(0), ivec3(255));
 
-	sdf = imageLoad(SourceMeshSDF, coord).x;
-	sdf += sin(totalTime + dot(nPos, nPos) * 16.0) * .25 * deltaTime;
+	float oldValue = imageLoad(SourceMeshSDF, coord).x;
 
-	imageStore(TargetMeshSDF, shiftedCoord, vec4(sdf));
+	float value = 0.0;
+	float count = 0.0;
+	for (int k = minBounds.z; k <= maxBounds.z; ++k) {
+		for (int j = minBounds.y; j <= maxBounds.y; ++j) {
+			for (int i = minBounds.x; i <= maxBounds.x; ++i) {
+				value += imageLoad(SourceMeshSDF, ivec3(i, j, k)).x;
+				++count;
+			}
+		}
+	}
+	value /= count;
+
+	float newValue = mix(oldValue, value, deltaTime * 100);
+
+	imageStore(TargetMeshSDF, coord, vec4(newValue));
 }

@@ -51,6 +51,8 @@ project.fragment.lock.json
 artifacts/
 **/Properties/launchSettings.json
 
+*.spv
+
 *_i.c
 *_p.c
 *_i.h
