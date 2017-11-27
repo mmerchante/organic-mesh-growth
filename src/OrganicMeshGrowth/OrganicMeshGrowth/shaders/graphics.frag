@@ -77,7 +77,7 @@ void main()
 
 	//outColor = vec4(sdf_viz(rayOrigin, rayDirection), 1.0);
 
-	for(int i = 0; i < 75; ++i)
+	for(int i = 0; i < 150; ++i)
 	{
 		vec3 pos = rayOrigin + rayDirection * t;
 		float dist = min(0.05, sdf(pos) * .05);
