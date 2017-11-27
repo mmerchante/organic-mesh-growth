@@ -39,7 +39,7 @@ void main() {
 	}
 	value /= count;
 
-	float newValue = mix(oldValue, value, min(1.0, deltaTime * 500));
+	float newValue = mix(oldValue, value, min(1.0, deltaTime * 50 * (sin(length(coord) / 6.0) * .5 + .5)));
 
 	imageStore(TargetMeshSDF, coord, vec4(newValue));
 }

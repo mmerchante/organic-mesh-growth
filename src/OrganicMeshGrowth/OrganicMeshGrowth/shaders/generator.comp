@@ -19,11 +19,192 @@ float fBox(vec3 p, vec3 b) {
 	return length(max(d, vec3(0))) + vmax(min(d, vec3(0)));
 }
 
+
+// All SDFS from iq, http://www.iquilezles.org/www/articles/distfunctions/distfunctions.htm
+// But they are tweaked for their threejs equivalents
+float sdSphere( vec3 p, float r )
+{
+	return length(p) - r;
+}
+
+float udBox(vec3 p, vec3 b)
+{
+	return length(max(abs(p) - b, 0.0));
+}
+
+// TODO: build a parabola mixed with a plane to solve the 
+// grazing angle/boundary iteration problem
+float sdPlane( vec3 p)
+{
+	return p.y;
+}
+
+float sdCappedCylinder( vec3 p, vec2 h)
+{
+  vec2 d = abs(vec2(length(p.xz),p.y)) - h;
+  return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+}
+
+float pow8(float x)
+{
+	x *= x; // xˆ2
+	x *= x; // xˆ4
+	return x * x;
+}
+
+// Reference: https://github.com/stackgl/glsl-smooth-min
+float smin(float a, float b, float k) 
+{
+  float res = exp(-k * a) + exp(-k * b);
+  return -log(res) / k;
+}
+float length8(vec2 v)
+{
+	return pow(pow8(v.x) + pow8(v.y), .125);
+}
+// float wheelDistance(Point3 X, Point3 C, float r, float R) {
+// return length8(Vector2(length(X.xz - C.xz) - r, X.y - C.y)) - R;
+// }
+
+float sdTorus82( vec3 p, vec2 t )
+{
+  vec2 q = vec2(length(p.xz)-t.x,p.y);
+  return length8(q)-t.y;
+}
+
+float sdTorus( vec3 p)
+{
+  vec2 q = vec2(length(p.xz)-1.0,p.y);
+  return length(q) - .2;
+}
+
+float sdHexPrism( vec3 p, vec2 h )
+{
+    vec3 q = abs(p);
+    return max(q.z-h.y,max((q.x*0.866025+q.y*0.5),q.y)-h.x);
+}
+
+float udRoundBox( vec3 p, vec3 b, float r )
+{
+	return length(max(abs(p) - b, 0.0)) - r;
+}
+
+float sdCappedCone( in vec3 p)
+{
+	p.y -= .25;
+    vec2 q = vec2( length(p.xz), p.y );
+    vec2 v = vec2(0.5773502691896258, -0.5773502691896258);
+    vec2 w = v - q;
+    vec2 vv = vec2( dot(v,v), v.x*v.x );
+    vec2 qv = vec2( dot(v,w), v.x*w.x );
+    vec2 d = max(qv,0.0) * qv / vv;
+    return sqrt(max(dot(w,w) - max(d.x,d.y), .000000001) ) * sign(max(q.y*v.x-q.x*v.y,w.y));
+}
+
+float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
+{
+    vec3 pa = p - a, ba = b - a;
+    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+    return length( pa - ba*h ) - r;
+}
+
+float sdEllipsoid( in vec3 p, in vec3 r )
+{
+    return (length( p/r ) - 1.0) * min(min(r.x,r.y),r.z);
+}
+
+float opUnion( float d1, float d2 )
+{
+    return min(d1, d2);
+}
+
+vec3 opCheapBend( vec3 p, float magnitude)
+{
+    float c = cos(magnitude * p.y);
+    float s = sin(magnitude * p.y);
+    mat2  m = mat2(c, -s, s, c);
+    vec3 q = vec3( m * p.xy, p.z);
+    return q;
+}
+
+float repeatDimension(float x, float m, float extent)
+{
+	return mix(x, mod(x + m * .5, m) - m * .5, step(abs(x + m * .5), extent));
+}
+
+float minionBaseSDF(vec3 point)
+{
+	point.y += .5;
+	point *= 4.0;
+	vec3 blendOffset = vec3(0.0, 1.5, 0.0);
+	vec3 bendedPoint = opCheapBend(point - blendOffset, .15) + blendOffset;
+	vec3 bendedPointSym = opCheapBend(point - blendOffset, -.15) + blendOffset;
+
+	float base = sdCapsule(point, vec3(0.0, .5, .0), vec3(0.0, 3.5, 0.0), 1.15);
+
+	float hand1 = sdCapsule(bendedPoint, vec3(1.15, 1.25, 0.0), vec3(2.25, .5, 0.0), .135);
+	float hand2 = sdCapsule(bendedPointSym, vec3(-1.15, 1.25, 0.0), vec3(-2.25, .5, 0.0), .135);
+
+	float foot1 = sdCapsule(point, vec3(0.45, -1.0, 0.0), vec3(0.35, 0.5, 0.0), .2);
+	float foot2 = sdCapsule(point, vec3(-0.45, -1.0, 0.0), vec3(-0.35, 0.5, 0.0), .2);
+
+	float dist = smin(base, hand1, 5.0);
+	dist = smin(dist, hand2, 5.0);
+	dist = smin(dist, foot1, 5.0);
+	dist = smin(dist, foot2, 5.0);
+
+	// Left Hand
+	bendedPointSym.y -= .15;
+	float handBase1 = sdCappedCylinder(bendedPointSym - vec3(1.6, -.45, 0.0), vec2(.2, .05));
+	handBase1 = smin(handBase1, sdCappedCylinder(bendedPointSym - vec3(1.6, -.6, 0.0), vec2(.1, .15)), 7.5);
+
+	// Base
+	handBase1 = smin(handBase1, sdSphere(bendedPointSym - vec3(1.6, -.8, 0.0), .15), 10.0);
+
+	// Fingers (note: cylinders would make it better.. but no time!)
+	handBase1 = smin(handBase1, sdSphere(bendedPointSym - vec3(1.3, -1.0, -0.1), .135), 20.0);
+	handBase1 = smin(handBase1, sdSphere(bendedPointSym - vec3(1.85, -1.0, -0.1), .135), 20.0);
+	handBase1 = smin(handBase1, sdSphere(bendedPointSym - vec3(1.6, -1.15, -.05), .135), 20.0);
+
+	dist = min(dist, handBase1);
+
+	// Right Hand
+	bendedPoint.y -= .15;
+	float handBase2 = sdCappedCylinder(bendedPoint - vec3(-1.6, -.45, 0.0), vec2(.2, .05));
+	handBase2 = smin(handBase2, sdCappedCylinder(bendedPoint - vec3(-1.6, -.6, 0.0), vec2(.1, .15)), 7.5);
+
+	// Base
+	handBase2 = smin(handBase2, sdSphere(bendedPoint - vec3(-1.6, -.8, 0.0), .15), 10.0);
+
+	// Fingers
+	handBase2 = smin(handBase2, sdSphere(bendedPoint - vec3(-1.3, -1.0, -0.1), .135), 20.0);
+	handBase2 = smin(handBase2, sdSphere(bendedPoint - vec3(-1.85, -1.0, -0.1), .135), 20.0);
+	handBase2 = smin(handBase2, sdSphere(bendedPoint - vec3(-1.6, -1.15, -.05), .135), 20.0);
+
+	dist = min(dist, handBase2);
+
+	vec3 glassPoint = point - vec3(0.0, 3.0, 1.15);	
+	float glassBase = sdTorus82(glassPoint.xzy, vec2(.5, .1));
+
+	float belt = sdTorus82(point - vec3(0.0, 3.0, 0.0), vec2(1.1, .125));
+	belt = max(belt, -sdSphere(glassPoint, .5));
+	glassBase = min(glassBase, belt);
+	dist = min(dist, glassBase);
+
+	dist = min(dist, sdSphere(glassPoint + vec3(0.0, 0.0, .35), .55));
+
+	float mouth = sdEllipsoid(opCheapBend(point, .25) - vec3(0.8, 1.5, 1.15), vec3(.4, .1, 1.0));
+
+	dist = max(dist, -mouth);
+
+	return dist;
+}
+
 void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
     vec3 nPos = (vec3(coord) / vec3(gl_WorkGroupSize * gl_NumWorkGroups)) * 2.0 - 1.0;
-	float sdf = fBox(nPos, vec3(0.35));
+	float sdf = minionBaseSDF(nPos);//fBox(nPos, vec3(0.35));
 
 	imageStore(MeshSDF, coord, vec4(sdf));
 }

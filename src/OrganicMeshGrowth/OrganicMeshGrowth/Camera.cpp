@@ -30,7 +30,7 @@ VkBuffer Camera::GetBuffer() const {
 void Camera::UpdateOrbit(float deltaX, float deltaY, float deltaZ) {
     theta += deltaX;
     phi += deltaY;
-    r = glm::clamp(r - deltaZ, 2.f, 10.0f);
+    r = glm::clamp(r - deltaZ, 1.5f, 10.0f);
 
     float radTheta = glm::radians(theta);
     float radPhi = glm::radians(phi);
