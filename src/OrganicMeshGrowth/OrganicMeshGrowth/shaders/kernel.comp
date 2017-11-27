@@ -45,6 +45,20 @@ float kernel(ivec3 x, vec3 dx, float sdf, vec3 normal) {
 	return activation * .05 * -NdotN * pow((dx.x + dx.y + dx.z), 4.0) + (activation) * -(neighbor - sdf) * .35 * pow((dx.x + dx.y + dx.z), 4.0);
 }
 
+float expansion(ivec3 x, vec3 dx, float sdf, vec3 normal) {
+	float neighbor = imageLoad(SourceMeshSDF, x).x;
+	float activation = clamp(1.0 - abs(smoothstep(0.0, .05, neighbor) - .5) / .5, 0.0, 1.0);
+
+	return -neighbor * 20.0;
+}
+
+float relaxation(ivec3 x, vec3 dx, float sdf, vec3 normal) {
+	float neighbor = imageLoad(SourceMeshSDF, x).x;
+	float activation = clamp(1.0 - abs(smoothstep(0.0, .05, neighbor) - .5) / .5, 0.0, 1.0);
+
+	return neighbor * 80.0;
+}
+
 void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
@@ -62,7 +76,7 @@ void main() {
 		for (int j = minBounds.y; j <= maxBounds.y; ++j) {
 			for (int i = minBounds.x; i <= maxBounds.x; ++i) {
 				ivec3 x = ivec3(i,j,k);
-				value += kernel(x, vec3(x - coord) / float(kernelHalfSize), oldValue, normal);
+				value += relaxation(x, vec3(x - coord) / float(kernelHalfSize), oldValue, normal);
 				++count;
 			}
 		}
