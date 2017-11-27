@@ -18,6 +18,27 @@ layout(set = 1, binding = 0) uniform Time {
 layout(set = 2, binding = 0, r32f) coherent uniform image3D SourceMeshSDF;
 layout(set = 3, binding = 0, r32f) coherent uniform image3D TargetMeshSDF;
 
+float sdf(ivec3 p) {
+	return imageLoad(SourceMeshSDF, p).x;
+}
+
+vec3 sdfNormal(ivec3 pos)
+{
+	ivec2 eps = ivec2(15, 0);
+
+	float dx = sdf(pos + eps.xyy) - sdf(pos - eps.xyy);
+	float dy = sdf(pos + eps.yxy) - sdf(pos - eps.yxy);
+	float dz = sdf(pos + eps.yyx) - sdf(pos - eps.yyx);
+
+	return normalize(vec3(dx, dy, dz));
+}
+
+float kernel(ivec3 x, float sdf, vec3 normal) {
+	float neighbor = imageLoad(SourceMeshSDF, x).x;
+	float activation = 1.0 - smoothstep(0.0, .05, neighbor);
+	return activation * (1.0 - max(0.0, dot(normal, sdfNormal(x))));
+}
+
 void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
@@ -26,20 +47,29 @@ void main() {
 	ivec3 maxBounds = clamp(coord + 1, ivec3(0), ivec3(255));
 
 	float oldValue = imageLoad(SourceMeshSDF, coord).x;
+	vec3 normal = sdfNormal(coord);
 
 	float value = 0.0;
 	float count = 0.0;
 	for (int k = minBounds.z; k <= maxBounds.z; ++k) {
 		for (int j = minBounds.y; j <= maxBounds.y; ++j) {
 			for (int i = minBounds.x; i <= maxBounds.x; ++i) {
-				value += imageLoad(SourceMeshSDF, ivec3(i, j, k)).x;
+				value += kernel(ivec3(i,j,k), oldValue, normal);
 				++count;
 			}
 		}
 	}
 	value /= count;
 
-	float newValue = mix(oldValue, value, min(1.0, deltaTime * 50 * (sin(length(coord) / 6.0) * .5 + .5)));
+	//float sinScale = 6.0;
+	//sinScale =  mod(totalTime, 6.0) * 100.0;
+
+	//float activation = 1.0 - abs(smoothstep(0.0, .05, max(0.0, oldValue)) - .5) / .5;
+	//float activation = 1.0 - smoothstep(0.001, .9, max(0.0, oldValue));
+	//float newValue = mix(oldValue, value, min(1.0, deltaTime * 0.2* (sin(coord.x / sinScale) * sin(coord.y / sinScale) * sin(coord.z / sinScale) * .5 + .5)));
+
+
+	float newValue = mix(oldValue, value, min(1.0, deltaTime * 0.2));
 
 	imageStore(TargetMeshSDF, coord, vec4(newValue));
 }
