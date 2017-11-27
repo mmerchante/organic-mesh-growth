@@ -1,4 +1,5 @@
 #include <vulkan/vulkan.h>
+#include <shaderc/shaderc.hpp>
 #include "Instance.h"
 #include "Window.h"
 #include "Renderer.h"
@@ -109,7 +110,7 @@ int main() {
     VkDeviceMemory grassImageMemory;
     Image::FromFile(device,
         transferCommandPool,
-        "images/grass.jpg",
+        "images/sphere_lit_1.png",
         VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -119,23 +120,62 @@ int main() {
         grassImageMemory
     );
 
-    float planeDim = 2.f;
+    float planeDim = 1.f;
     float halfWidth = planeDim * 0.5f;
-    Model* plane = new Model(device, transferCommandPool,
+    Model* cube = new Model(device, transferCommandPool,
         {
-            { { -halfWidth, 0.0f, halfWidth }, { 1.0f, 0.0f, 0.0f },{ 1.0f, 0.0f } },
-            { { halfWidth, 0.0f, halfWidth }, { 0.0f, 1.0f, 0.0f },{ 0.0f, 0.0f } },
-            { { halfWidth, 0.0f, -halfWidth }, { 0.0f, 0.0f, 1.0f },{ 0.0f, 1.0f } },
-            { { -halfWidth, 0.0f, -halfWidth }, { 1.0f, 1.0f, 1.0f },{ 1.0f, 1.0f } }
+            
+			// UP face
+			{ { -halfWidth, halfWidth, halfWidth }},
+            { { halfWidth, halfWidth, halfWidth } },
+            { { halfWidth, halfWidth, -halfWidth } },
+			{ { -halfWidth, halfWidth, -halfWidth } },
+			
+			// DOWN face
+			{ { -halfWidth, -halfWidth, halfWidth } },
+			{ { halfWidth, -halfWidth, halfWidth } },
+			{ { halfWidth, -halfWidth, -halfWidth } },
+			{ { -halfWidth, -halfWidth, -halfWidth } },
+
+			// RIGHT face
+			{ { halfWidth, -halfWidth, halfWidth } },
+			{ { halfWidth, halfWidth, halfWidth } },
+			{ { halfWidth, halfWidth, -halfWidth } },
+			{ { halfWidth, -halfWidth, -halfWidth } },
+
+			// LEFT face
+			{ { -halfWidth, -halfWidth, halfWidth } },
+			{ { -halfWidth, halfWidth, halfWidth } },
+			{ { -halfWidth, halfWidth, -halfWidth } },
+			{ { -halfWidth, -halfWidth, -halfWidth } },
+
+			// FRONT face
+			{ { -halfWidth, halfWidth, halfWidth } },
+			{ { halfWidth, halfWidth, halfWidth } },
+			{ { halfWidth, -halfWidth, halfWidth } },
+			{ { -halfWidth, -halfWidth, halfWidth } },
+
+			// BACK face
+			{ { -halfWidth, halfWidth, -halfWidth } },
+			{ { halfWidth, halfWidth, -halfWidth } },
+			{ { halfWidth, -halfWidth, -halfWidth } },
+			{ { -halfWidth, -halfWidth, -halfWidth } },
         },
-        { 0, 1, 2, 2, 3, 0 }
+        {
+			0, 1, 2, 2, 3, 0, 
+			6, 5, 4, 4, 7, 6,
+			10, 9, 8, 8, 11, 10,
+			12, 13, 14, 14, 15, 12,
+			18, 17, 16, 16, 19, 18,
+			20, 21, 22, 22, 23, 20
+		}
     );
-    plane->SetTexture(grassImage);
+    cube->SetTexture(grassImage);
 
     vkDestroyCommandPool(device->GetVkDevice(), transferCommandPool, nullptr);
 
     Scene* scene = new Scene(device);
-    scene->AddModel(plane);
+    scene->AddModel(cube);
 	scene->CreateSceneSDF();
 
     renderer = new Renderer(device, swapChain, scene, camera);
@@ -157,7 +197,7 @@ int main() {
     vkFreeMemory(device->GetVkDevice(), grassImageMemory, nullptr);
 
     delete scene;
-    delete plane;
+    delete cube;
     delete camera;
     delete renderer;
     delete swapChain;

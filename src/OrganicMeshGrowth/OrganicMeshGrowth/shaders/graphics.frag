@@ -1,15 +1,20 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
+#define MAX_DISTANCE 1.7320508
 #define EPSILON 0.001
+
+layout(set = 0, binding = 0) uniform CameraBufferObject {
+    mat4 view;
+	mat4 proj;
+	mat4 invViewProj;
+	vec3 position;
+} camera;
 
 layout(set = 1, binding = 1) uniform sampler2D texSampler;
 layout(set = 1, binding = 2) uniform sampler3D sdfSampler;
 
-layout(location = 0) in vec3 fragColor;
-layout(location = 1) in vec2 fragTexCoord;
-layout(location = 2) in vec3 rayDirection;
-layout(location = 3) in vec3 rayOrigin;
+layout(location = 0) in vec3 rayOrigin;
 
 layout(location = 0) out vec4 outColor;
 
@@ -44,35 +49,38 @@ vec3 sdfNormal(vec3 pos, float epsilon)
 	return normalize(vec3(dx, dy, dz));
 }
 
+const vec3 CLEAR_COLOR = vec3(.1, .09, .1);
+
 vec3 sdf_viz(vec3 rO, vec3 rD)
 {
 	rO.y += .5;
     float t = -rO.y / rD.y;
         
     if(t < 0.0)
-        return vec3(0.0);
+        return CLEAR_COLOR;
     
     vec3 p = rO + rD * t;    
 
 	if(abs(p.x) > .5 || abs(p.z) > .5)
-		return vec3(0.0);
+		return CLEAR_COLOR;
 
+	p.y -= .5;
     float d = sdf(p) * 3.0;
-    return vec3(smoothstep(.1, .2, mod(d, 1.0)) * .5);
+    return mix(CLEAR_COLOR, CLEAR_COLOR * 2.0, (smoothstep(.1, .2, mod(d, 1.0)) * .5));
 }
-
 
 void main() 
 {
+	vec3 rayDirection = normalize(rayOrigin - camera.position);
 	float t = 0.0;
 	bool hit = false;
 
 	//outColor = vec4(sdf_viz(rayOrigin, rayDirection), 1.0);
 
-	for(int i = 0; i < 150; ++i)
+	for(int i = 0; i < 75; ++i)
 	{
 		vec3 pos = rayOrigin + rayDirection * t;
-		float dist = sdf(pos) * .05;
+		float dist = min(0.05, sdf(pos) * .05);
 
 		t += dist;
 
@@ -82,13 +90,19 @@ void main()
 			break;
 		}
 
+		// A bit expensive but eh
+		if(vmax(abs(pos)) > .5 + EPSILON)
+			break;
 	}
 
 	if(hit)
 	{
 		vec3 pos = rayOrigin + rayDirection * t;
 		vec3 normal = sdfNormal(pos, EPSILON);
-		outColor = vec4(dot(normal, vec3(.577))) * .75 + .25;
+
+		vec3 ssNormal = (camera.view * vec4(normal, 0.0)).xyz * vec3(1.0, -1.0, 1.0) * .5 + .5;
+		//outColor = vec4(dot(normal, vec3(.577))) * .75 + .25;
+		outColor = texture(texSampler, ssNormal.xy);
 	}
 	else
 	{
