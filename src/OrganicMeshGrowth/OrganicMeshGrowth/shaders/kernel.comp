@@ -2,6 +2,17 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 #define WORKGROUP_SIZE 8
+#define SDF_TEXTURE_SIZE 256
+
+#define MOLTEN_CORE
+
+#ifdef MOLTEN_CORE
+	#define MAIN_DISPLACEMENT_FUNCTION moltenCoreDisplacement
+	#define KERNEL_DISPLACEMENT_FUNCTION moltenCoreKernel
+	#define KERNEL_HALF_SIZE 1
+#elif BISMUTH
+	
+#endif
 
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = WORKGROUP_SIZE) in;
 
@@ -18,12 +29,31 @@ layout(set = 1, binding = 0) uniform Time {
 layout(set = 2, binding = 0, r32f) coherent uniform image3D SourceMeshSDF;
 layout(set = 3, binding = 0, r32f) coherent uniform image3D TargetMeshSDF;
 
+float KernelSum = 0;
+
+struct CurrentState {
+	float sdf;
+	vec3 position;
+	vec3 normal;
+	ivec3 coord;
+};
+
+struct KernelInput {
+	float neighborSDF;
+	vec3 normalizedOffset;
+	vec3 neighborNormal;
+	vec3 neighborCoord;
+};
+
 float sdf(ivec3 p) {
 	return imageLoad(SourceMeshSDF, p).x;
 }
 
-vec3 sdfNormal(ivec3 pos, int offset)
-{
+float activation(float sdf, float min, float max) {
+	return clamp(1.0 - abs(smoothstep(min, max, sdf) - .5) / .5, 0.0, 1.0);
+}
+
+vec3 sdfNormal(ivec3 pos, int offset) {
 	ivec2 eps = ivec2(offset, 0);
 
 	float dx = sdf(pos + eps.xyy) - sdf(pos - eps.xyy);
@@ -33,74 +63,103 @@ vec3 sdfNormal(ivec3 pos, int offset)
 	return normalize(vec3(dx, dy, dz));
 }
 
-float kernel(ivec3 x, vec3 dx, float sdf, vec3 normal) {
-	float neighbor = imageLoad(SourceMeshSDF, x).x;
-	float activation = clamp(1.0 - abs(smoothstep(0.0, .05, neighbor) - .5) / .5, 0.0, 1.0);
+//float kernel(ivec3 x, vec3 dx, float sdf, vec3 normal, out float weight) {
+//	float neighbor = imageLoad(SourceMeshSDF, x).x;
+//	float activation = clamp(1.0 - abs(smoothstep(0.0, .05, neighbor) - .5) / .5, 0.0, 1.0);
 
-	if(activation > 0.0)
-	{
-		vec3 n = sdfNormal(x, 4);
+//	if(activation > 0.0)
+//	{
+//		vec3 n = sdfNormal(x, 15);
 
-		// We want to grow when the normals are different
-		float NdotN = 1.0 - smoothstep(0.2, 0.45, dot(normal, n));
-		dx = abs(dx);
+//		// We want to grow when the normals are different
+//		float NdotN = 1.0 - smoothstep(0.2, 0.45, dot(normal, n));
+//		dx = abs(dx);
 
-		float manhattanDistance = pow((dx.x + dx.y + dx.z), 4.0);
-		float curvatureGrowth = .05 * -NdotN * manhattanDistance;
-		float borderGrowth = -(neighbor - sdf) * .35 * manhattanDistance;
+//		float manhattanDistance = pow((dx.x + dx.y + dx.z), 4.0);
+//		float curvatureGrowth = .05 * -NdotN * manhattanDistance;
+//		float borderGrowth = -(neighbor - sdf) * .35 * manhattanDistance;
 
-		return activation * (curvatureGrowth + borderGrowth);
-	}
+//		return activation * (curvatureGrowth + borderGrowth) * deltaTime * .1;
+//	}
 
-	return 0.0;
+//	return 0.0;
+//}
+
+
+/**************************************************************
+* KERNEL DISPLACEMENT
+*************************************************************/
+
+float relaxation(CurrentState current, KernelInput kInput) {
+	float activation = clamp(1.0 - abs(smoothstep(0.0, .2, kInput.neighborSDF) - .5) / .5, 0.0, 1.0);
+	KernelSum += 1.0;
+	return (kInput.neighborSDF - current.sdf) * 40.0;// * activation;
 }
 
-float expansion(ivec3 x, vec3 dx, float sdf, vec3 normal) {
-	float neighbor = imageLoad(SourceMeshSDF, x).x;
-	float activation = clamp(1.0 - abs(smoothstep(0.0, .05, neighbor) - .5) / .5, 0.0, 1.0);
-
-	return -neighbor * 20.0;
+float moltenCoreKernel(CurrentState current, KernelInput kInput) {
+	return relaxation(current, kInput) * .5 * deltaTime;
 }
 
-float relaxation(ivec3 x, vec3 dx, float sdf, vec3 normal) {
-	float neighbor = imageLoad(SourceMeshSDF, x).x;
-	float activation = clamp(1.0 - abs(smoothstep(0.0, .05, neighbor) - .5) / .5, 0.0, 1.0);
+/**************************************************************
+* VECTOR FIELD DISPLACEMENT
+*************************************************************/
 
-	return neighbor * 80.0;
+float gravityDisplacement(CurrentState current, float gravity) {
+	return max(0.0, -current.normal.y) * -gravity * deltaTime;
+}
+
+float expansionDisplacement(CurrentState current, float expansion) {
+	return -expansion * deltaTime;
+}
+
+float moltenCoreDisplacement(CurrentState current) {
+	return gravityDisplacement(current, 100.0) * activation(current.sdf, 0.0, .1);
+}
+
+/**************************************************************
+* MAIN 
+*************************************************************/
+void CreateKernelInput(ivec3 coord, ivec3 x, out KernelInput kInput) {
+	kInput.neighborCoord = x;
+
+#ifdef KERNEL_NORMAL
+	kInput.neighborNormal = sdfNormal(x, 2);
+#endif
+
+	kInput.normalizedOffset = vec3(x - coord) / float(KERNEL_HALF_SIZE);
+	kInput.neighborSDF = sdf(x);
 }
 
 void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
 
-	int kernelHalfSize = 1;
-	ivec3 minBounds = clamp(coord - kernelHalfSize, ivec3(0), ivec3(255));
-	ivec3 maxBounds = clamp(coord + kernelHalfSize, ivec3(0), ivec3(255));
+	ivec3 minBounds = clamp(coord - KERNEL_HALF_SIZE, ivec3(0), ivec3(SDF_TEXTURE_SIZE - 1));
+	ivec3 maxBounds = clamp(coord + KERNEL_HALF_SIZE, ivec3(0), ivec3(SDF_TEXTURE_SIZE - 1));
 
-	float oldValue = imageLoad(SourceMeshSDF, coord).x;
-	vec3 normal = sdfNormal(coord, 1);
+	CurrentState current;
+	current.coord = coord;
+	current.normal = sdfNormal(coord, 1);
+	current.sdf = sdf(coord);
+	current.position = vec3(coord / float(SDF_TEXTURE_SIZE));
 
-	float value = 0.0;
-	float count = 0.0;
+	float delta = 0.0;
+	KernelSum = 0.0;
+
 	for (int k = minBounds.z; k <= maxBounds.z; ++k) {
 		for (int j = minBounds.y; j <= maxBounds.y; ++j) {
 			for (int i = minBounds.x; i <= maxBounds.x; ++i) {
-				ivec3 x = ivec3(i,j,k);
-				//value += kernel(x, vec3(x - coord) / float(kernelHalfSize), oldValue, normal);
-				//value += relaxation(x, vec3(x - coord) / float(kernelHalfSize), oldValue, normal) * .0025;
-				value += -.2;
-				++count;
+				KernelInput kInput;		
+				CreateKernelInput(coord, ivec3(i,j,k), kInput);
+				delta += KERNEL_DISPLACEMENT_FUNCTION(current, kInput);
 			}
 		}
 	}
-	value /= count;
 
-	//vec3 nPos = vec3(coord / 256.0) * 12.0;
-	//vec3 dir = vec3(cos(nPos.x), -(sin(nPos.y) * .5 + .5), cos(nPos.z));
-	//value += -max(0.0, dot(normal, dir)) * .05;
+	if(KernelSum != 0.0)
+		delta /= KernelSum;
+	
+	delta += MAIN_DISPLACEMENT_FUNCTION(current);
 
-	// The growth kernel is relative to its current value
-	float newValue = mix(oldValue, oldValue + value, min(1.0, deltaTime * .1));
-
-	imageStore(TargetMeshSDF, coord, vec4(newValue));
+	imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
 }

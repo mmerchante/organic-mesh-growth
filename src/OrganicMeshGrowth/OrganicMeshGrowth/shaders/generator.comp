@@ -259,7 +259,7 @@ float randomCubes(vec3 p)
 		vec3 offset = vec3(random(seed), random(seed), random(seed)) - .5;
 		vec3 size = vec3(random(seed), random(seed), random(seed)) * .2;
 		mat3x3 rot = rotationAxisAngle(normalize(vec3(random(seed), random(seed), random(seed))), random(seed) * 3.14);
-		//p = rot * p;
+		p = rot * p;
 		d = min(d, fBox(p - offset, size));
 	}	
 
