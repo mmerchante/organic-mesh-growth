@@ -252,7 +252,7 @@ float randomCubes(vec3 p)
 {
 	float d = 1000.0;
 
-	uint seed = 14041956 + 73123;
+	uint seed = 14041956 + 34534;
 
 	for(int i = 0; i < 32; i++)
 	{
@@ -270,7 +270,7 @@ void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
     vec3 nPos = (vec3(coord) / vec3(gl_WorkGroupSize * gl_NumWorkGroups)) * 2.0 - 1.0;
-	float sdf = minionBaseSDF(nPos);//fBox(nPos, vec3(0.35));
+	float sdf = randomCubes(nPos);//fBox(nPos, vec3(0.35));
 
 	imageStore(MeshSDF, coord, vec4(sdf));
 }

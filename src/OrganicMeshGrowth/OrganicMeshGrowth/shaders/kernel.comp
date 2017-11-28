@@ -63,6 +63,16 @@ vec3 sdfNormal(ivec3 pos, int offset) {
 	return normalize(vec3(dx, dy, dz));
 }
 
+vec3 sdfCurvature(ivec3 pos, int offset) {
+	ivec2 eps = ivec2(offset, 0);
+
+	vec3 dx = sdfNormal(pos + eps.xyy, offset) - sdfNormal(pos - eps.xyy, offset);
+	vec3 dy = sdfNormal(pos + eps.yxy, offset) - sdfNormal(pos - eps.yxy, offset);
+	vec3 dz = sdfNormal(pos + eps.yyx, offset) - sdfNormal(pos - eps.yyx, offset);
+
+	return normalize(dx + dy + dz);
+}
+
 //float kernel(ivec3 x, vec3 dx, float sdf, vec3 normal, out float weight) {
 //	float neighbor = imageLoad(SourceMeshSDF, x).x;
 //	float activation = clamp(1.0 - abs(smoothstep(0.0, .05, neighbor) - .5) / .5, 0.0, 1.0);
@@ -90,19 +100,29 @@ vec3 sdfNormal(ivec3 pos, int offset) {
 * KERNEL DISPLACEMENT
 *************************************************************/
 
-float relaxation(CurrentState current, KernelInput kInput) {
+float voidKernel(CurrentState current, KernelInput kInput) {
+	return 0.0;
+}
+
+float relaxation(CurrentState current, KernelInput kInput, float strength) {
 	float activation = clamp(1.0 - abs(smoothstep(0.0, .2, kInput.neighborSDF) - .5) / .5, 0.0, 1.0);
 	KernelSum += 1.0;
-	return (kInput.neighborSDF - current.sdf) * 40.0;// * activation;
+	return (kInput.neighborSDF - current.sdf) * strength;// * activation;
 }
 
 float moltenCoreKernel(CurrentState current, KernelInput kInput) {
-	return relaxation(current, kInput) * .5 * deltaTime;
+	return relaxation(current, kInput, 1.5) * deltaTime;
 }
 
 /**************************************************************
 * VECTOR FIELD DISPLACEMENT
 *************************************************************/
+
+float curvatureDisplacement(CurrentState current, float strength) {
+	vec3 c = sdfCurvature(current.coord, 15);
+	float d = max(0.0, dot(c, current.normal)) * -strength * deltaTime;
+	return d;
+}
 
 float gravityDisplacement(CurrentState current, float gravity) {
 	return max(0.0, -current.normal.y) * -gravity * deltaTime;
@@ -113,7 +133,8 @@ float expansionDisplacement(CurrentState current, float expansion) {
 }
 
 float moltenCoreDisplacement(CurrentState current) {
-	return gravityDisplacement(current, 100.0) * activation(current.sdf, 0.0, .1);
+	//return gravityDisplacement(current, 100.0) * activation(current.sdf, 0.0, .1);
+	return curvatureDisplacement(current, .02);// * activation(current.sdf, 0.0, .2);
 }
 
 /**************************************************************
