@@ -712,7 +712,7 @@ void Renderer::CreateKernelComputePipeline() {
     computeShaderStageInfo.module = computeShaderModule;
     computeShaderStageInfo.pName = "main";
 
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { cameraDescriptorSetLayout, timeDescriptorSetLayout, sceneSDFDescriptorSetLayout, sceneSDFDescriptorSetLayout };
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { cameraDescriptorSetLayout, timeDescriptorSetLayout, sceneSDFDescriptorSetLayout, sceneSDFDescriptorSetLayout, vectorFieldDescriptorSetLayout };
 
     // Create pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
@@ -932,6 +932,9 @@ void Renderer::RecordKernelComputeCommandBuffer() {
 		// Bind descriptor set for 3D texture
 		vkCmdBindDescriptorSets(primaryKernelCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, kernelComputePipelineLayout, 3, 1, &secondarySceneSDFDescriptorSet, 0, nullptr);
 
+		// Bind descriptor set for vector field
+		vkCmdBindDescriptorSets(primaryKernelCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, kernelComputePipelineLayout, 4, 1, &vectorFieldDescriptorSet, 0, nullptr);
+
 		vkCmdDispatch(primaryKernelCommandBuffer, 32, 32, 32);
 
 		// ~ End recording ~
@@ -966,6 +969,9 @@ void Renderer::RecordKernelComputeCommandBuffer() {
 
 		// Bind descriptor set for 3D texture
 		vkCmdBindDescriptorSets(secondaryKernelCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, kernelComputePipelineLayout, 3, 1, &primarySceneSDFDescriptorSet, 0, nullptr);
+
+		// Bind descriptor set for vector field
+		vkCmdBindDescriptorSets(secondaryKernelCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, kernelComputePipelineLayout, 4, 1, &vectorFieldDescriptorSet, 0, nullptr);
 
 		vkCmdDispatch(secondaryKernelCommandBuffer, 32, 32, 32);
 
