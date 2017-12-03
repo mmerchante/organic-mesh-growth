@@ -61,7 +61,7 @@ void Scene::CreateSceneSDF()
 	samplerInfo.maxLod = 0.0f;
 
 	for (int i = 0; i < 2; ++i) {
-		sceneSDF.push_back(new Texture3D(device, 256, 256, 256, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo));
+		sceneSDF.push_back(new Texture3D(device, 512, 512, 512, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo));
 	}
 }
 
@@ -99,7 +99,7 @@ void Scene::CreateVectorField()
 	samplerInfo.minLod = 0.0f;
 	samplerInfo.maxLod = 0.0f;
 
-	this->vectorFieldTexture = new Texture3D(device, 256, 256, 256, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo);
+	this->vectorFieldTexture = new Texture3D(device, 512, 512, 512, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo);
 }
 
 Texture3D * Scene::GetVectorField()

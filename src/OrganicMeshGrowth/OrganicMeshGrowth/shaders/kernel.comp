@@ -2,7 +2,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 #define WORKGROUP_SIZE 8
-#define SDF_TEXTURE_SIZE 256
+#define SDF_TEXTURE_SIZE 512
 #define TWO_PI 6.28318530718
 
 #define MOLTEN_CORE
@@ -176,7 +176,7 @@ float curvatureDisplacement(CurrentState current, float strength) {
 }
 
 float repulsionDisplacement(CurrentState current, float delta, float strength) {
-	uint numSamples = 20;
+	uint numSamples = 8;
 	uint seed = current.coord.x + SDF_TEXTURE_SIZE * current.coord.y + SDF_TEXTURE_SIZE * SDF_TEXTURE_SIZE * current.coord.z + int(totalTime * 1000.0);
 	float totalRepulsion = 0.0;
 	for (uint i = 0; i < numSamples; i++) {
@@ -199,6 +199,11 @@ float vectorFieldDisplacement(CurrentState current, float strength) {
 	return max(-1.0, abs(-dot(field, current.normal))) * -strength * deltaTime;
 }
 
+float noiseExpansionDisplacement(CurrentState current, float strength) {
+	float expansion = imageLoad(VectorField, current.coord).a;
+	return -expansion * strength * deltaTime;
+}
+
 float expansionDisplacement(CurrentState current, float expansion) {
 	return -expansion * deltaTime;
 }
@@ -206,9 +211,9 @@ float expansionDisplacement(CurrentState current, float expansion) {
 float moltenCoreDisplacement(CurrentState current) {
 	//return gravityDisplacement(current, 100.0) * activation(current.sdf, 0.0, .1);
 
-	float repulsion = repulsionDisplacement(current, 0.015, 80.0) * activation(current.sdf, 0.0, .1);
+	float repulsion = repulsionDisplacement(current, 0.012, 80.0) * activation(current.sdf, 0.0, .1);
 	float vectorField = vectorFieldDisplacement(current, .01);
-	float expansion = expansionDisplacement(current, .02);
+	float expansion = noiseExpansionDisplacement(current, .1);
 	return repulsion + vectorField + expansion;
 }
 

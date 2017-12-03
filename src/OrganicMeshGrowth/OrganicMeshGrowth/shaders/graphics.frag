@@ -36,7 +36,7 @@ float sdf(vec3 pos)
 {
 	pos += .5;
 	float dist = texture(sdfSampler, pos).x;
-	return dist;
+	return max(0.0, dist);
 }
 
 vec3 sdfNormal(vec3 pos, float epsilon)
@@ -103,7 +103,7 @@ void main()
 		vec3 pos = rayOrigin + rayDirection * t;
 		dist = sdf(pos);// min(0.05, sdf(pos) * .05);
 
-		t += clamp(dist * .05, 0.0, .001);
+		t += dist * .01;//clamp(dist * .05, 0.0, .001);
 
 		if(dist < EPSILON)
 		{

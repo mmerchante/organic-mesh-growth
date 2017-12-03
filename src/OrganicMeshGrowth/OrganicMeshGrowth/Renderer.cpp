@@ -935,7 +935,7 @@ void Renderer::RecordKernelComputeCommandBuffer() {
 		// Bind descriptor set for vector field
 		vkCmdBindDescriptorSets(primaryKernelCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, kernelComputePipelineLayout, 4, 1, &vectorFieldDescriptorSet, 0, nullptr);
 
-		vkCmdDispatch(primaryKernelCommandBuffer, 32, 32, 32);
+		vkCmdDispatch(primaryKernelCommandBuffer, 64, 64, 64);
 
 		// ~ End recording ~
 		if (vkEndCommandBuffer(primaryKernelCommandBuffer) != VK_SUCCESS) {
@@ -973,7 +973,7 @@ void Renderer::RecordKernelComputeCommandBuffer() {
 		// Bind descriptor set for vector field
 		vkCmdBindDescriptorSets(secondaryKernelCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, kernelComputePipelineLayout, 4, 1, &vectorFieldDescriptorSet, 0, nullptr);
 
-		vkCmdDispatch(secondaryKernelCommandBuffer, 32, 32, 32);
+		vkCmdDispatch(secondaryKernelCommandBuffer, 64, 64, 64);
 
 		// ~ End recording ~
 		if (vkEndCommandBuffer(secondaryKernelCommandBuffer) != VK_SUCCESS) {
@@ -1014,7 +1014,7 @@ void Renderer::RecordGeneratorComputeCommandBuffer()
 	// Bind descriptor set for vector field 
 	vkCmdBindDescriptorSets(generatorCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, generatorComputePipelineLayout, 1, 1, &vectorFieldDescriptorSet, 0, nullptr);
 
-	vkCmdDispatch(generatorCommandBuffer, 32, 32, 32);
+	vkCmdDispatch(generatorCommandBuffer, 64, 64, 64);
 
 	// ~ End recording ~
 	if (vkEndCommandBuffer(generatorCommandBuffer) != VK_SUCCESS) {
