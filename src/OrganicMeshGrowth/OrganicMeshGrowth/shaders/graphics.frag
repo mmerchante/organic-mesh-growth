@@ -98,7 +98,7 @@ void main()
 	bool hit = false;
 	float dist = 100.0;
 
-	for(int i = 0; i < 1000.0; ++i)
+	for(int i = 0; i < 1500.0; ++i)
 	{
 		vec3 pos = rayOrigin + rayDirection * t;
 		dist = sdf(pos);// min(0.05, sdf(pos) * .05);

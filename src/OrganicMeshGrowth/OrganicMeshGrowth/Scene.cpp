@@ -20,7 +20,7 @@ void Scene::UpdateTime() {
     duration<float> nextDeltaTime = duration_cast<duration<float>>(currentTime - startTime);
     startTime = currentTime;
 
-    time.deltaTime = nextDeltaTime.count();
+	time.deltaTime = .016;// nextDeltaTime.count();
     time.totalTime += time.deltaTime;
 
     memcpy(mappedData, &time, sizeof(Time));

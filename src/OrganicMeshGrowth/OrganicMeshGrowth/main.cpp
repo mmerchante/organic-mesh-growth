@@ -181,11 +181,11 @@ int main() {
 
     renderer = new Renderer(device, swapChain, scene, camera);
 	renderer->GenerateSceneSDF();
-
+	
     glfwSetWindowSizeCallback(GetGLFWWindow(), resizeCallback);
     glfwSetMouseButtonCallback(GetGLFWWindow(), mouseDownCallback);
     glfwSetCursorPosCallback(GetGLFWWindow(), mouseMoveCallback);
-
+	
     while (!ShouldQuit()) {
         glfwPollEvents();
         scene->UpdateTime();

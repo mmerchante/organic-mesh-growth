@@ -29,6 +29,7 @@ layout(set = 1, binding = 0) uniform Time {
 
 layout(set = 2, binding = 0, r32f) coherent uniform image3D SourceMeshSDF;
 layout(set = 3, binding = 0, r32f) coherent uniform image3D TargetMeshSDF;
+layout(set = 4, binding = 0, rgba8) coherent uniform image3D VectorField;
 
 float KernelSum = 0;
 
@@ -51,7 +52,9 @@ float sdf(ivec3 p) {
 }
 
 float activation(float sdf, float min, float max) {
-	return clamp(1.0 - abs(smoothstep(min, max, sdf) - .5) / .5, 0.0, 1.0);
+	float x = clamp((sdf - min) / (max - min), 0.0, 1.0);
+	return clamp((1 + cos((x+.5)*6.28)) / 2.10, 0.0, 1.0);
+	//return clamp(1.0 - abs(smoothstep(min, max, sdf) - .5) / .5, 0.0, 1.0);
 }
 
 vec3 sdfNormal(ivec3 pos, int offset) {
@@ -154,9 +157,8 @@ float voidKernel(CurrentState current, KernelInput kInput) {
 }
 
 float relaxation(CurrentState current, KernelInput kInput, float strength) {
-	float activation = clamp(1.0 - abs(smoothstep(0.0, .2, kInput.neighborSDF) - .5) / .5, 0.0, 1.0);
 	KernelSum += 1.0;
-	return (kInput.neighborSDF - current.sdf) * strength;// * activation;
+	return (kInput.neighborSDF - current.sdf) * strength;
 }
 
 float moltenCoreKernel(CurrentState current, KernelInput kInput) {
@@ -175,11 +177,12 @@ float curvatureDisplacement(CurrentState current, float strength) {
 
 float repulsionDisplacement(CurrentState current, float delta, float strength) {
 	uint numSamples = 20;
-	uint seed = current.coord.x + SDF_TEXTURE_SIZE * current.coord.y + SDF_TEXTURE_SIZE * SDF_TEXTURE_SIZE * current.coord.z + int(totalTime * 60.0);
+	uint seed = current.coord.x + SDF_TEXTURE_SIZE * current.coord.y + SDF_TEXTURE_SIZE * SDF_TEXTURE_SIZE * current.coord.z + int(totalTime * 1000.0);
 	float totalRepulsion = 0.0;
 	for (uint i = 0; i < numSamples; i++) {
 		vec3 direction = cosineWeightedSample(current.normal, seed);
-		vec3 compared = current.position + (direction * delta);
+		float d = delta * (random(seed) * .5 + .5);
+		vec3 compared = current.position + (direction * d);
 		ivec3 comparedCoord = ivec3(compared * SDF_TEXTURE_SIZE);
 		float repulsion = imageLoad(SourceMeshSDF, comparedCoord).x;
 		totalRepulsion += -min(0.0, repulsion);
@@ -191,13 +194,22 @@ float gravityDisplacement(CurrentState current, float gravity) {
 	return max(0.0, -current.normal.y) * -gravity * deltaTime;
 }
 
+float vectorFieldDisplacement(CurrentState current, float strength) {
+	vec3 field = imageLoad(VectorField, current.coord).xyz;
+	return max(-1.0, abs(-dot(field, current.normal))) * -strength * deltaTime;
+}
+
 float expansionDisplacement(CurrentState current, float expansion) {
 	return -expansion * deltaTime;
 }
 
 float moltenCoreDisplacement(CurrentState current) {
 	//return gravityDisplacement(current, 100.0) * activation(current.sdf, 0.0, .1);
-	return repulsionDisplacement(current, 0.01, 80.0) * activation(current.sdf, 0.0, .1) + expansionDisplacement(current, 0.01);
+
+	float repulsion = repulsionDisplacement(current, 0.015, 80.0) * activation(current.sdf, 0.0, .1);
+	float vectorField = vectorFieldDisplacement(current, .01);
+	float expansion = expansionDisplacement(current, .02);
+	return repulsion + vectorField + expansion;
 }
 
 /**************************************************************
