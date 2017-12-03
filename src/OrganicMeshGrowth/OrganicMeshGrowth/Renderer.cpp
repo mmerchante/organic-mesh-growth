@@ -23,13 +23,18 @@ Renderer::Renderer(Device* device, SwapChain* swapChain, Scene* scene, Camera* c
     CreateModelDescriptorSetLayout();
     CreateTimeDescriptorSetLayout();
     CreateSceneSDFDescriptorSetLayout();
+	CreateVectorFieldDescriptorSetLayout();
+
     CreateDescriptorPool();
-    CreateCameraDescriptorSet();
+    
+	CreateCameraDescriptorSet();
     CreateModelDescriptorSets(true);
 	CreateModelDescriptorSets(false);
     CreateTimeDescriptorSet();
     CreateSceneSDFDescriptorSet();
-    CreateFrameResources();
+	CreateVectorFieldDescriptorSet();
+    
+	CreateFrameResources();
     CreateRaymarchingPipeline();
     CreateKernelComputePipeline();
 	CreateGeneratorComputePipeline();
@@ -171,7 +176,14 @@ void Renderer::CreateModelDescriptorSetLayout() {
 	sdfLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	sdfLayoutBinding.pImmutableSamplers = nullptr;
 
-    std::vector<VkDescriptorSetLayoutBinding> bindings = { uboLayoutBinding, samplerLayoutBinding, sdfLayoutBinding };
+	VkDescriptorSetLayoutBinding vectorFieldLayoutBinding = {};
+	vectorFieldLayoutBinding.binding = 3;
+	vectorFieldLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	vectorFieldLayoutBinding.descriptorCount = 1;
+	vectorFieldLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	vectorFieldLayoutBinding.pImmutableSamplers = nullptr;
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings = { uboLayoutBinding, samplerLayoutBinding, sdfLayoutBinding, vectorFieldLayoutBinding };
 
     // Create the descriptor set layout
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
@@ -228,14 +240,37 @@ void Renderer::CreateSceneSDFDescriptorSetLayout()
 	}
 }
 
+void Renderer::CreateVectorFieldDescriptorSetLayout()
+{
+	VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+	samplerLayoutBinding.binding = 0;
+	samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	samplerLayoutBinding.descriptorCount = 1;
+	samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT; // We may want to visualize it
+	samplerLayoutBinding.pImmutableSamplers = nullptr;
+
+	std::vector<VkDescriptorSetLayoutBinding> bindings = { samplerLayoutBinding };
+
+	// Create the descriptor set layout
+	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+	layoutInfo.pBindings = bindings.data();
+
+	if (vkCreateDescriptorSetLayout(logicalDevice, &layoutInfo, nullptr, &vectorFieldDescriptorSetLayout) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create vector field descriptor set layout");
+	}
+}
+
 void Renderer::CreateDescriptorPool() {
+
     // Describe which descriptor types that the descriptor sets will contain
     std::vector<VkDescriptorPoolSize> poolSizes = {
         // Camera
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , 2},
 
         // Models
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER , 4 * static_cast<uint32_t>(scene->GetModels().size()) },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER , 6 * static_cast<uint32_t>(scene->GetModels().size()) },
 
         // Models
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , 2 * static_cast<uint32_t>(scene->GetModels().size()) },
@@ -244,7 +279,7 @@ void Renderer::CreateDescriptorPool() {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , 2 },
 
 		// 3D Texture 
-		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 8 } 
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 9 } 
     };
 
     VkDescriptorPoolCreateInfo poolInfo = {};
@@ -311,7 +346,7 @@ void Renderer::CreateModelDescriptorSets(bool primary) {
         throw std::runtime_error("Failed to allocate descriptor set");
     }
 
-    std::vector<VkWriteDescriptorSet> descriptorWrites(3 * modelDescriptorSets.size());
+    std::vector<VkWriteDescriptorSet> descriptorWrites(4 * modelDescriptorSets.size());
 
     for (uint32_t i = 0; i < scene->GetModels().size(); ++i) {
         VkDescriptorBufferInfo modelBufferInfo = {};
@@ -325,23 +360,23 @@ void Renderer::CreateModelDescriptorSets(bool primary) {
         imageInfo.imageView = scene->GetModels()[i]->GetTextureView();
         imageInfo.sampler = scene->GetModels()[i]->GetTextureSampler();
 
-        descriptorWrites[3 * i + 0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[3 * i + 0].dstSet = modelDescriptorSets[i];
-        descriptorWrites[3 * i + 0].dstBinding = 0;
-        descriptorWrites[3 * i + 0].dstArrayElement = 0;
-        descriptorWrites[3 * i + 0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrites[3 * i + 0].descriptorCount = 1;
-        descriptorWrites[3 * i + 0].pBufferInfo = &modelBufferInfo;
-        descriptorWrites[3 * i + 0].pImageInfo = nullptr;
-        descriptorWrites[3 * i + 0].pTexelBufferView = nullptr;
+        descriptorWrites[4 * i + 0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[4 * i + 0].dstSet = modelDescriptorSets[i];
+        descriptorWrites[4 * i + 0].dstBinding = 0;
+        descriptorWrites[4 * i + 0].dstArrayElement = 0;
+        descriptorWrites[4 * i + 0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[4 * i + 0].descriptorCount = 1;
+        descriptorWrites[4 * i + 0].pBufferInfo = &modelBufferInfo;
+        descriptorWrites[4 * i + 0].pImageInfo = nullptr;
+        descriptorWrites[4 * i + 0].pTexelBufferView = nullptr;
 
-        descriptorWrites[3 * i + 1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[3 * i + 1].dstSet = modelDescriptorSets[i];
-        descriptorWrites[3 * i + 1].dstBinding = 1;
-        descriptorWrites[3 * i + 1].dstArrayElement = 0;
-        descriptorWrites[3 * i + 1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[3 * i + 1].descriptorCount = 1;
-        descriptorWrites[3 * i + 1].pImageInfo = &imageInfo;
+        descriptorWrites[4 * i + 1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[4 * i + 1].dstSet = modelDescriptorSets[i];
+        descriptorWrites[4 * i + 1].dstBinding = 1;
+        descriptorWrites[4 * i + 1].dstArrayElement = 0;
+        descriptorWrites[4 * i + 1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[4 * i + 1].descriptorCount = 1;
+        descriptorWrites[4 * i + 1].pImageInfo = &imageInfo;
 
 		// Bind image and sampler resources to the descriptor
 		VkDescriptorImageInfo sdfImageInfo = {};
@@ -349,13 +384,27 @@ void Renderer::CreateModelDescriptorSets(bool primary) {
 		sdfImageInfo.imageView = scene->GetSceneSDF(0)->GetImageView();
 		sdfImageInfo.sampler = scene->GetSceneSDF(0)->GetSampler();
 
-		descriptorWrites[3 * i + 2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[3 * i + 2].dstSet = modelDescriptorSets[i];
-		descriptorWrites[3 * i + 2].dstBinding = 2;
-		descriptorWrites[3 * i + 2].dstArrayElement = 0;
-		descriptorWrites[3 * i + 2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrites[3 * i + 2].descriptorCount = 1;
-		descriptorWrites[3 * i + 2].pImageInfo = &sdfImageInfo;
+		descriptorWrites[4 * i + 2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[4 * i + 2].dstSet = modelDescriptorSets[i];
+		descriptorWrites[4 * i + 2].dstBinding = 2;
+		descriptorWrites[4 * i + 2].dstArrayElement = 0;
+		descriptorWrites[4 * i + 2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[4 * i + 2].descriptorCount = 1;
+		descriptorWrites[4 * i + 2].pImageInfo = &sdfImageInfo;
+
+		// Bind image and sampler resources to the descriptor
+		VkDescriptorImageInfo vectorFieldImageInfo = {};
+		vectorFieldImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		vectorFieldImageInfo.imageView = scene->GetVectorField()->GetImageView();
+		vectorFieldImageInfo.sampler = scene->GetVectorField()->GetSampler();
+
+		descriptorWrites[4 * i + 3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[4 * i + 3].dstSet = modelDescriptorSets[i];
+		descriptorWrites[4 * i + 3].dstBinding = 3;
+		descriptorWrites[4 * i + 3].dstArrayElement = 0;
+		descriptorWrites[4 * i + 3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[4 * i + 3].descriptorCount = 1;
+		descriptorWrites[4 * i + 3].pImageInfo = &vectorFieldImageInfo;
     }
 
     // Update descriptor sets
@@ -457,6 +506,41 @@ void Renderer::CreateSceneSDFDescriptorSet()
 		// Update descriptor sets
 		vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 	}
+}
+
+void Renderer::CreateVectorFieldDescriptorSet()
+{
+	// Describe the desciptor set
+	VkDescriptorSetLayout layouts[] = { vectorFieldDescriptorSetLayout };
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = layouts;
+
+	// Allocate descriptor sets
+	if (vkAllocateDescriptorSets(logicalDevice, &allocInfo, &vectorFieldDescriptorSet) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to allocate primary compute descriptor set");
+	}
+
+	std::vector<VkWriteDescriptorSet> descriptorWrites(1);
+
+	// Bind image and sampler resources to the descriptor
+	VkDescriptorImageInfo imageInfo = {};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	imageInfo.imageView = scene->GetVectorField()->GetImageView();
+	imageInfo.sampler = scene->GetVectorField()->GetSampler();
+
+	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[0].dstSet = vectorFieldDescriptorSet;
+	descriptorWrites[0].dstBinding = 0;
+	descriptorWrites[0].dstArrayElement = 0;
+	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	descriptorWrites[0].descriptorCount = 1;
+	descriptorWrites[0].pImageInfo = &imageInfo;
+
+	// Update descriptor sets
+	vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
 void Renderer::CreateRaymarchingPipeline() {
@@ -671,7 +755,7 @@ void Renderer::CreateGeneratorComputePipeline()
 	computeShaderStageInfo.module = computeShaderModule;
 	computeShaderStageInfo.pName = "main";
 
-	std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { sceneSDFDescriptorSetLayout };
+	std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { sceneSDFDescriptorSetLayout, vectorFieldDescriptorSetLayout };
 
 	// Create pipeline layout
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
@@ -920,6 +1004,9 @@ void Renderer::RecordGeneratorComputeCommandBuffer()
 
 	// Bind descriptor set for 3D texture
 	vkCmdBindDescriptorSets(generatorCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, generatorComputePipelineLayout, 0, 1, &primarySceneSDFDescriptorSet, 0, nullptr);
+
+	// Bind descriptor set for vector field 
+	vkCmdBindDescriptorSets(generatorCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, generatorComputePipelineLayout, 1, 1, &vectorFieldDescriptorSet, 0, nullptr);
 
 	vkCmdDispatch(generatorCommandBuffer, 32, 32, 32);
 

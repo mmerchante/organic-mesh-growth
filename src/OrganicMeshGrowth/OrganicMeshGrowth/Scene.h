@@ -21,6 +21,7 @@ private:
     VkDeviceMemory timeBufferMemory;
     Time time;
 	std::vector<Texture3D*> sceneSDF;
+	Texture3D* vectorFieldTexture;
     
     void* mappedData;
 
@@ -41,6 +42,9 @@ public:
 
 	Texture3D* GetSceneSDF(int index);
 	void CreateSceneSDF();
+
+	void CreateVectorField();
+	Texture3D* GetVectorField();
 
     void UpdateTime();
 };
