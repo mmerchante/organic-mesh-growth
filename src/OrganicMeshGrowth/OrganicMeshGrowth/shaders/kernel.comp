@@ -3,6 +3,7 @@
 
 #define WORKGROUP_SIZE 8
 #define SDF_TEXTURE_SIZE 256
+#define TWO_PI 6.28318530718
 
 #define MOLTEN_CORE
 
@@ -95,6 +96,54 @@ vec3 sdfCurvature(ivec3 pos, int offset) {
 //	return 0.0;
 //}
 
+// A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
+uint hash( uint x ) {
+    x += ( x << 10u );
+    x ^= ( x >>  6u );
+    x += ( x <<  3u );
+    x ^= ( x >> 11u );
+    x += ( x << 15u );
+    return x;
+}
+
+
+// Construct a float with half-open range [0:1] using low 23 bits.
+// All zeroes yields 0.0, all ones yields the next smallest representable value below 1.0.
+float floatConstruct( uint m ) {
+    const uint ieeeMantissa = 0x007FFFFFu; // binary32 mantissa bitmask
+    const uint ieeeOne      = 0x3F800000u; // 1.0 in IEEE binary32
+
+    m &= ieeeMantissa;                     // Keep only mantissa bits (fractional part)
+    m |= ieeeOne;                          // Add fractional part to 1.0
+
+    float  f = uintBitsToFloat( m );       // Range [1:2]
+    return f - 1.0;                        // Range [0:1]
+}
+
+float random(inout uint seed)
+{
+	seed = hash(seed);
+	return floatConstruct(seed);
+}
+
+vec3 cosineWeightedSample(vec3 normal, inout uint seed) {
+	float u1 = random(seed);
+	float u2 = random(seed);
+
+	float r = sqrt(u1);
+	float theta = TWO_PI * u2;
+
+	float x = r * cos(theta);
+	float y = r * sin(theta);
+	float z = sqrt(max(0.0, 1.0 - u1));
+
+	vec3 up = vec3(0.0, 0.0, 1.0);
+	vec3 v = normalize(cross(normal, up));
+	vec3 u = normalize(cross(v, normal));
+
+	return normalize(v * x + u * y + normal * z);
+}
+
 
 /**************************************************************
 * KERNEL DISPLACEMENT
@@ -124,6 +173,20 @@ float curvatureDisplacement(CurrentState current, float strength) {
 	return d;
 }
 
+float repulsionDisplacement(CurrentState current, float delta, float strength) {
+	uint numSamples = 20;
+	uint seed = current.coord.x + SDF_TEXTURE_SIZE * current.coord.y + SDF_TEXTURE_SIZE * SDF_TEXTURE_SIZE * current.coord.z + int(totalTime * 60.0);
+	float totalRepulsion = 0.0;
+	for (uint i = 0; i < numSamples; i++) {
+		vec3 direction = cosineWeightedSample(current.normal, seed);
+		vec3 compared = current.position + (direction * delta);
+		ivec3 comparedCoord = ivec3(compared * SDF_TEXTURE_SIZE);
+		float repulsion = imageLoad(SourceMeshSDF, comparedCoord).x;
+		totalRepulsion += -min(0.0, repulsion);
+	}
+	return (totalRepulsion / float(numSamples)) * strength * deltaTime;
+}
+
 float gravityDisplacement(CurrentState current, float gravity) {
 	return max(0.0, -current.normal.y) * -gravity * deltaTime;
 }
@@ -134,7 +197,7 @@ float expansionDisplacement(CurrentState current, float expansion) {
 
 float moltenCoreDisplacement(CurrentState current) {
 	//return gravityDisplacement(current, 100.0) * activation(current.sdf, 0.0, .1);
-	return curvatureDisplacement(current, .02);// * activation(current.sdf, 0.0, .2);
+	return repulsionDisplacement(current, 0.01, 80.0) * activation(current.sdf, 0.0, .1) + expansionDisplacement(current, 0.01);
 }
 
 /**************************************************************
