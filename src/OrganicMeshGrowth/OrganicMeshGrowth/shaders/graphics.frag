@@ -13,6 +13,7 @@ layout(set = 0, binding = 0) uniform CameraBufferObject {
 
 layout(set = 1, binding = 1) uniform sampler2D texSampler;
 layout(set = 1, binding = 2) uniform sampler3D sdfSampler;
+layout(set = 1, binding = 3) uniform sampler3D vectorFieldSampler;
 
 layout(location = 0) in vec3 rayOrigin;
 
@@ -122,7 +123,9 @@ void main()
 
 		// Sphere lit
 		vec3 ssNormal = (camera.view * vec4(normal, 0.0)).xyz * vec3(1.0, -1.0, 1.0) * .5 + .5;
-		outColor = texture(texSampler, ssNormal.xy + length(pos) * .1);
+		//outColor = texture(texSampler, ssNormal.xy + length(pos) * .1);
+
+		outColor = texture(vectorFieldSampler, pos);
 	}
 	else
 	{

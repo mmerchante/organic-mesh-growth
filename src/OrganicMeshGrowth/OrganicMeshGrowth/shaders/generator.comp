@@ -5,6 +5,7 @@
 
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = WORKGROUP_SIZE) in;
 layout(set = 0, binding = 0, r32f) coherent uniform image3D MeshSDF;
+layout(set = 1, binding = 0, rgba8) coherent uniform image3D VectorField;
 
 float vmax(vec3 v) {
 	return max(max(v.x, v.y), v.z);
@@ -271,6 +272,9 @@ void main() {
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
     vec3 nPos = (vec3(coord) / vec3(gl_WorkGroupSize * gl_NumWorkGroups)) * 2.0 - 1.0;
 	float sdf = randomCubes(nPos);//fBox(nPos, vec3(0.35));
+
+
+	imageStore(VectorField, coord, vec4(.2));
 
 	imageStore(MeshSDF, coord, vec4(sdf));
 }

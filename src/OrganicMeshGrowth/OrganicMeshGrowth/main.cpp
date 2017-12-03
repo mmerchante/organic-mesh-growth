@@ -177,6 +177,7 @@ int main() {
     Scene* scene = new Scene(device);
     scene->AddModel(cube);
 	scene->CreateSceneSDF();
+	scene->CreateVectorField();
 
     renderer = new Renderer(device, swapChain, scene, camera);
 	renderer->GenerateSceneSDF();

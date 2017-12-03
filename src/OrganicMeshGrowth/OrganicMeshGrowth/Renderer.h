@@ -21,6 +21,7 @@ public:
     void CreateModelDescriptorSetLayout();
     void CreateTimeDescriptorSetLayout();
     void CreateSceneSDFDescriptorSetLayout();
+	void CreateVectorFieldDescriptorSetLayout();
 
     void CreateDescriptorPool();
 
@@ -28,6 +29,7 @@ public:
     void CreateModelDescriptorSets(bool primary);
     void CreateTimeDescriptorSet();
     void CreateSceneSDFDescriptorSet();
+	void CreateVectorFieldDescriptorSet();
 
     void CreateRaymarchingPipeline();
     void CreateKernelComputePipeline();
@@ -64,11 +66,13 @@ private:
     VkDescriptorSetLayout modelDescriptorSetLayout;
 	VkDescriptorSetLayout timeDescriptorSetLayout;
     VkDescriptorSetLayout sceneSDFDescriptorSetLayout;
+	VkDescriptorSetLayout vectorFieldDescriptorSetLayout;
 
     VkDescriptorSet cameraDescriptorSet;
     VkDescriptorSet timeDescriptorSet;
 	VkDescriptorSet primarySceneSDFDescriptorSet;
 	VkDescriptorSet secondarySceneSDFDescriptorSet;
+	VkDescriptorSet vectorFieldDescriptorSet;
 
     std::vector<VkDescriptorSet> primaryModelDescriptorSets;
 	std::vector<VkDescriptorSet> secondaryModelDescriptorSets;
