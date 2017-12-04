@@ -77,6 +77,33 @@ vec3 sdfCurvature(ivec3 pos, int offset) {
 	return normalize(dx + dy + dz);
 }
 
+//Curvature in 7-tap (more accurate)
+float curv2(ivec3 p, int offset)
+{
+    ivec2 eps = ivec2(offset, 0);
+
+    float t1 = sdf(p + eps.xyy), t2 = sdf(p - eps.xyy);
+    float t3 = sdf(p + eps.yxy), t4 = sdf(p - eps.yxy);
+    float t5 = sdf(p + eps.yyx), t6 = sdf(p - eps.yyx);
+    
+    return (.25 / offset) * (t1 + t2 + t3 + t4 + t5 + t6 - 6.0 * sdf(p));
+}
+vec3 curlSDF(ivec3 p, int offset)
+{
+	int normalOffset = 1;
+	ivec2 eps = ivec2(offset, 0);
+
+	float dXdy = sdfNormal(p + eps.yxy, normalOffset).x - sdfNormal(p - eps.yxy, normalOffset).x;
+	float dXdz = sdfNormal(p + eps.yyx, normalOffset).x - sdfNormal(p - eps.yyx, normalOffset).x;
+
+	float dYdx = sdfNormal(p + eps.xyy, normalOffset).y - sdfNormal(p - eps.xyy, normalOffset).y;
+	float dYdz = sdfNormal(p + eps.yyx, normalOffset).y - sdfNormal(p - eps.yyx, normalOffset).y;
+
+	float dZdx = sdfNormal(p + eps.xyy, normalOffset).z - sdfNormal(p - eps.xyy, normalOffset).z;
+	float dZdy = sdfNormal(p + eps.yxy, normalOffset).z - sdfNormal(p - eps.yxy, normalOffset).z;
+
+	return normalize(vec3(dZdy - dYdz, dXdz - dZdx, dYdx - dXdy));
+}
 //float kernel(ivec3 x, vec3 dx, float sdf, vec3 normal, out float weight) {
 //	float neighbor = imageLoad(SourceMeshSDF, x).x;
 //	float activation = clamp(1.0 - abs(smoothstep(0.0, .05, neighbor) - .5) / .5, 0.0, 1.0);
@@ -162,6 +189,7 @@ float relaxation(CurrentState current, KernelInput kInput, float strength) {
 }
 
 float moltenCoreKernel(CurrentState current, KernelInput kInput) {
+	//float perlin = imageLoad(VectorField, current.coord).a;
 	return relaxation(current, kInput, 1.5) * deltaTime;
 }
 
@@ -170,9 +198,10 @@ float moltenCoreKernel(CurrentState current, KernelInput kInput) {
 *************************************************************/
 
 float curvatureDisplacement(CurrentState current, float strength) {
-	vec3 c = sdfCurvature(current.coord, 15);
-	float d = max(0.0, dot(c, current.normal)) * -strength * deltaTime;
-	return d;
+	//vec3 c = sdfCurvature(current.coord, 15);
+	float c = curv2(current.coord, 10);
+	//float d = max(0.0, -dot(c, current.normal)) * -strength * deltaTime;
+	return max(0.0, c) * -strength * deltaTime;
 }
 
 float repulsionDisplacement(CurrentState current, float delta, float strength) {
@@ -184,7 +213,7 @@ float repulsionDisplacement(CurrentState current, float delta, float strength) {
 		float d = delta * (random(seed) * .5 + .5);
 		vec3 compared = current.position + (direction * d);
 		ivec3 comparedCoord = ivec3(compared * SDF_TEXTURE_SIZE);
-		float repulsion = imageLoad(SourceMeshSDF, comparedCoord).x;
+		float repulsion = imageLoad(SourceMeshSDF, comparedCoord).x * dot(current.normal, direction) * (1.0 - (d/delta));
 		totalRepulsion += -min(0.0, repulsion);
 	}
 	return (totalRepulsion / float(numSamples)) * strength * deltaTime;
@@ -196,11 +225,11 @@ float gravityDisplacement(CurrentState current, float gravity) {
 
 float vectorFieldDisplacement(CurrentState current, float strength) {
 	vec3 field = imageLoad(VectorField, current.coord).xyz;
-	return max(-1.0, abs(-dot(field, current.normal))) * -strength * deltaTime;
+	return max(0.0, -dot(field, current.normal)) * -strength * deltaTime;
 }
 
 float noiseExpansionDisplacement(CurrentState current, float strength) {
-	float expansion = imageLoad(VectorField, current.coord).a;
+	float expansion = smoothstep(.7, 1.0, imageLoad(VectorField, current.coord).a);
 	return -expansion * strength * deltaTime;
 }
 
@@ -209,12 +238,16 @@ float expansionDisplacement(CurrentState current, float expansion) {
 }
 
 float moltenCoreDisplacement(CurrentState current) {
-	//return gravityDisplacement(current, 100.0) * activation(current.sdf, 0.0, .1);
 
-	float repulsion = repulsionDisplacement(current, 0.012, 80.0) * activation(current.sdf, 0.0, .1);
-	float vectorField = vectorFieldDisplacement(current, .01);
-	float expansion = noiseExpansionDisplacement(current, .1);
-	return repulsion + vectorField + expansion;
+	float repulsion = repulsionDisplacement(current, 0.025, 550.0) * activation(current.sdf, 0.0, .1);
+	float curvature = curvatureDisplacement(current, 10.0) * activation(current.sdf, -.1, .2);
+	float expansion = expansionDisplacement(current, .01);
+	float curl = vectorFieldDisplacement(current, .0065);
+	float noise = noiseExpansionDisplacement(current, .15);
+	float gravity = gravityDisplacement(current, 10.0) * activation(current.sdf, -.1, .6);
+	//return repulsion + curvature + expansion - gravityDisplacement(current, 1.0) * activation(current.sdf, 0.0, .1);
+
+	return repulsion + noise;// gravity + repulsion; 
 }
 
 /**************************************************************

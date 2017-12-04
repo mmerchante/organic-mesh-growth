@@ -91,6 +91,17 @@ float evaluateAmbientOcclusion(vec3 point, vec3 normal)
 	return clamp(1.0 - ao * AO_INTENSITY, 0.0, 1.0);
 }
 
+//Curvature in 7-tap (more accurate)
+float curv2(in vec3 p, in float w)
+{
+    vec3 e = vec3(w, 0, 0);
+    
+    float t1 = sdf(p + e.xyy), t2 = sdf(p - e.xyy);
+    float t3 = sdf(p + e.yxy), t4 = sdf(p - e.yxy);
+    float t5 = sdf(p + e.yyx), t6 = sdf(p - e.yyx);
+    
+    return .25/e.x*(t1 + t2 + t3 + t4 + t5 + t6 - 6.0*sdf(p));
+}
 void main() 
 {
 	vec3 rayDirection = normalize(rayOrigin - camera.position);
@@ -103,7 +114,7 @@ void main()
 		vec3 pos = rayOrigin + rayDirection * t;
 		dist = sdf(pos);// min(0.05, sdf(pos) * .05);
 
-		t += dist * .01;//clamp(dist * .05, 0.0, .001);
+		t += dist * .02;//clamp(dist * .05, 0.0, .001);
 
 		if(dist < EPSILON)
 		{
@@ -123,7 +134,8 @@ void main()
 
 		// Sphere lit
 		vec3 ssNormal = (camera.view * vec4(normal, 0.0)).xyz * vec3(1.0, -1.0, 1.0) * .5 + .5;
-		outColor = texture(texSampler, ssNormal.xy + length(pos) * .1);
+		outColor = texture(texSampler, ssNormal.xy);
+		//outColor = vec4(curv2(pos, .1)) * .5;
 
 		//outColor = texture(vectorFieldSampler, pos * .5 + .5);
 	}

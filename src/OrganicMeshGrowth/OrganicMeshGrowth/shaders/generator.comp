@@ -385,13 +385,41 @@ vec3 curl3D(vec3 p, float epsilon)
 	return vec3(dN3dy - dN2dz, dN1dz - dN3dx, dN2dx - dN1dy) / epsilon;
 }
 
+float randomSpheres(vec3 p)
+{
+	float d = 1000.0;
+
+	uint seed = 14041956 + 34534;
+
+	for(int i = 0; i < 32; i++)
+	{
+		vec3 offset = vec3(random(seed), random(seed), random(seed)) - .5;
+		vec3 size = vec3(random(seed), random(seed), random(seed)) * .2;
+		mat3x3 rot = rotationAxisAngle(normalize(vec3(random(seed), random(seed), random(seed))), random(seed) * 3.14);
+		p = rot * p;
+		float radius = mix(.05, .3, random(seed));
+		d = min(d, length(p + offset) - radius);
+	}	
+
+	return d;
+}
+
 void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
     vec3 nPos = (vec3(coord) / vec3(gl_WorkGroupSize * gl_NumWorkGroups)) * 2.0 - 1.0;
-	float sdf =  minionBaseSDF(nPos);//length(nPos) - .35;// minionBaseSDF(nPos);//fBox(nPos, vec3(0.35));
 
-	imageStore(VectorField, coord, vec4(curl3D(nPos * 2.0 + vec3(.123, .64, 5.0), .01), perlin3D(nPos * 5.0)));
+	//nPos.xz += sin(nPos.y * 14.0) * .1;
+	//float sdf = length(nPos) - .45;// minionBaseSDF(nPos);//fBox(nPos, vec3(0.35));
+
+	//sdf -= sin(nPos.y * 32.0) * .1;
+	//sdf -= perlin3D(nPos * 8.0) * .02;
+
+
+	nPos += perlin3D(nPos * 4.0) * .1;
+	float sdf = randomSpheres(nPos);
+
+	imageStore(VectorField, coord, vec4(curl3D(nPos * 3.0 + vec3(.123, .64, 5.0), .01), perlin3D(nPos * 5.0)));
 
 	imageStore(MeshSDF, coord, vec4(sdf));
 }
