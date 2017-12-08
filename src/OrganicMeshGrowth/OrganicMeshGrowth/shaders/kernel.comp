@@ -6,6 +6,7 @@
 #define TWO_PI 6.28318530718
 
 #define MOLTEN_CORE
+//#define SHARED_MEMORY
 
 #ifdef MOLTEN_CORE
 	#define MAIN_DISPLACEMENT_FUNCTION moltenCoreDisplacement
@@ -31,6 +32,10 @@ layout(set = 2, binding = 0, r32f) coherent uniform image3D SourceMeshSDF;
 layout(set = 3, binding = 0, r32f) coherent uniform image3D TargetMeshSDF;
 layout(set = 4, binding = 0, rgba8) coherent uniform image3D VectorField;
 
+#ifdef SHARED_MEMORY
+	shared float sharedData[(WORKGROUP_SIZE + (KERNEL_HALF_SIZE * 2)) * (WORKGROUP_SIZE + (KERNEL_HALF_SIZE * 2)) * (WORKGROUP_SIZE + (KERNEL_HALF_SIZE * 2))];
+#endif
+
 float KernelSum = 0;
 
 struct CurrentState {
@@ -46,6 +51,15 @@ struct KernelInput {
 	vec3 neighborNormal;
 	vec3 neighborCoord;
 };
+
+#ifdef SHARED_MEMORY
+float sharedSDF(ivec3 p) {
+	vec3 sharedCoord = mod(p, WORKGROUP_SIZE);
+	int flatIndex = int(sharedCoord.x + (WORKGROUP_SIZE * sharedCoord.y) + (WORKGROUP_SIZE * WORKGROUP_SIZE * sharedCoord.z));
+	// TODO: Replace
+	return imageLoad(SourceMeshSDF, p).x;
+}
+#endif
 
 float sdf(ivec3 p) {
 	return imageLoad(SourceMeshSDF, p).x;
@@ -261,12 +275,37 @@ void CreateKernelInput(ivec3 coord, ivec3 x, out KernelInput kInput) {
 #endif
 
 	kInput.normalizedOffset = vec3(x - coord) / float(KERNEL_HALF_SIZE);
+
+#ifdef SHARED_MEMORY
+	kInput.neighborSDF = sharedSDF(x);
+#else
 	kInput.neighborSDF = sdf(x);
+#endif
 }
+
+#ifdef SHARED_MEMORY
+void populateSharedMemory(ivec3 coord) {
+	vec3 modCoord = mod(coord, WORKGROUP_SIZE);
+	vec3 sharedCoord = modCoord + vec3(KERNEL_HALF_SIZE);
+	int flatIndex = int(sharedCoord.x + (WORKGROUP_SIZE * sharedCoord.y) + (WORKGROUP_SIZE * WORKGROUP_SIZE * sharedCoord.z));
+	
+	// Populate myself
+	sharedData[flatIndex] = imageLoad(SourceMeshSDF, coord).x;
+
+	// Populate my neighbors if border
+	vec3 borderInfo = vec3(1.0) - step(vec3(WORKGROUP_SIZE), modCoord) * step(modCoord, vec3(0.0));
+	// TODO: Finish
+}
+#endif
 
 void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
+
+#ifdef SHARED_MEMORY
+	populateSharedMemory(coord);
+	memoryBarrierShared();
+#endif
 
 	ivec3 minBounds = clamp(coord - KERNEL_HALF_SIZE, ivec3(0), ivec3(SDF_TEXTURE_SIZE - 1));
 	ivec3 maxBounds = clamp(coord + KERNEL_HALF_SIZE, ivec3(0), ivec3(SDF_TEXTURE_SIZE - 1));
@@ -274,7 +313,11 @@ void main() {
 	CurrentState current;
 	current.coord = coord;
 	current.normal = sdfNormal(coord, 1);
+#ifdef SHARED_MEMORY
+	current.sdf = sharedSDF(coord);
+#else
 	current.sdf = sdf(coord);
+#endif
 	current.position = vec3(coord / float(SDF_TEXTURE_SIZE));
 
 	float delta = 0.0;
