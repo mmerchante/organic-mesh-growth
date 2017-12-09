@@ -22,6 +22,7 @@ public:
     void CreateTimeDescriptorSetLayout();
     void CreateSceneSDFDescriptorSetLayout();
 	void CreateVectorFieldDescriptorSetLayout();
+	void CreateGeneratorDescriptorSetLayout();
 
     void CreateDescriptorPool();
 
@@ -30,6 +31,7 @@ public:
     void CreateTimeDescriptorSet();
     void CreateSceneSDFDescriptorSet();
 	void CreateVectorFieldDescriptorSet();
+	void CreateGeneratorDescriptorSet();
 
     void CreateRaymarchingPipeline();
     void CreateKernelComputePipeline();
@@ -67,7 +69,9 @@ private:
 	VkDescriptorSetLayout timeDescriptorSetLayout;
     VkDescriptorSetLayout sceneSDFDescriptorSetLayout;
 	VkDescriptorSetLayout vectorFieldDescriptorSetLayout;
+	VkDescriptorSetLayout generatorDescriptorSetLayout;
 
+	VkDescriptorSet generatorDescriptorSet;
     VkDescriptorSet cameraDescriptorSet;
     VkDescriptorSet timeDescriptorSet;
 	VkDescriptorSet primarySceneSDFDescriptorSet;

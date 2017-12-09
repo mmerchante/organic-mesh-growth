@@ -84,7 +84,11 @@ int main() {
     }
 
     instance->PickPhysicalDevice({ VK_KHR_SWAPCHAIN_EXTENSION_NAME }, QueueFlagBit::GraphicsBit | QueueFlagBit::TransferBit | QueueFlagBit::ComputeBit | QueueFlagBit::PresentBit, surface);
-
+/*
+	// Uncomment and break for debugging purposes
+	VkPhysicalDeviceProperties deviceProperties;
+	vkGetPhysicalDeviceProperties(instance->GetPhysicalDevice(), &deviceProperties);
+*/
     VkPhysicalDeviceFeatures deviceFeatures = {};
     deviceFeatures.tessellationShader = VK_TRUE;
     deviceFeatures.fillModeNonSolid = VK_TRUE;
@@ -178,6 +182,7 @@ int main() {
     scene->AddModel(cube);
 	scene->CreateSceneSDF();
 	scene->CreateVectorField();
+	scene->LoadMesh("meshes/bunny.obj");
 
     renderer = new Renderer(device, swapChain, scene, camera);
 	renderer->GenerateSceneSDF();

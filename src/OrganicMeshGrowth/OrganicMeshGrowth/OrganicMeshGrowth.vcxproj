@@ -189,6 +189,7 @@
     <ClInclude Include="ShaderModule.h" />
     <ClInclude Include="SwapChain.h" />
     <ClInclude Include="Texture3D.h" />
+    <ClInclude Include="tiny_obj_loader.h" />
     <ClInclude Include="Vertex.h" />
     <ClInclude Include="Window.h" />
   </ItemGroup>

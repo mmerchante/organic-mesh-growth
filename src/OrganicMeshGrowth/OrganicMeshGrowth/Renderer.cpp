@@ -24,6 +24,7 @@ Renderer::Renderer(Device* device, SwapChain* swapChain, Scene* scene, Camera* c
     CreateTimeDescriptorSetLayout();
     CreateSceneSDFDescriptorSetLayout();
 	CreateVectorFieldDescriptorSetLayout();
+	CreateGeneratorDescriptorSetLayout();
 
     CreateDescriptorPool();
     
@@ -33,6 +34,7 @@ Renderer::Renderer(Device* device, SwapChain* swapChain, Scene* scene, Camera* c
     CreateTimeDescriptorSet();
     CreateSceneSDFDescriptorSet();
 	CreateVectorFieldDescriptorSet();
+	CreateGeneratorDescriptorSet();
     
 	CreateFrameResources();
     CreateRaymarchingPipeline();
@@ -196,6 +198,36 @@ void Renderer::CreateModelDescriptorSetLayout() {
     }
 }
 
+void Renderer::CreateGeneratorDescriptorSetLayout()
+{
+	// Describe the binding of the descriptor set layout
+    VkDescriptorSetLayoutBinding storageLayoutBinding = {};
+    storageLayoutBinding.binding = 0;
+    storageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    storageLayoutBinding.descriptorCount = 1;
+    storageLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    storageLayoutBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutBinding sizeLayoutBinding = {};
+	sizeLayoutBinding.binding = 1;
+	sizeLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	sizeLayoutBinding.descriptorCount = 1;
+	sizeLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	sizeLayoutBinding.pImmutableSamplers = nullptr;
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings = { storageLayoutBinding, sizeLayoutBinding };
+
+    // Create the descriptor set layout
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(logicalDevice, &layoutInfo, nullptr, &generatorDescriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create generator descriptor set layout");
+    }
+}
+
 void Renderer::CreateTimeDescriptorSetLayout() {
     // Describe the binding of the descriptor set layout
     VkDescriptorSetLayoutBinding uboLayoutBinding = {};
@@ -279,7 +311,12 @@ void Renderer::CreateDescriptorPool() {
         { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , 2 },
 
 		// 3D Texture 
-		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 9 } 
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 9 },
+
+		// Mesh attribute buffer
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , 1 },
+
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}
     };
 
     VkDescriptorPoolCreateInfo poolInfo = {};
@@ -291,6 +328,57 @@ void Renderer::CreateDescriptorPool() {
     if (vkCreateDescriptorPool(logicalDevice, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create descriptor pool");
     }
+}
+
+void Renderer::CreateGeneratorDescriptorSet()
+{
+	// Describe the desciptor set
+	VkDescriptorSetLayout layouts[] = { generatorDescriptorSetLayout };
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = layouts;
+
+	// Allocate descriptor sets
+	if (vkAllocateDescriptorSets(logicalDevice, &allocInfo, &generatorDescriptorSet) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to allocate descriptor set");
+	}
+
+	// Configure the descriptors to refer to buffers
+	VkDescriptorBufferInfo generatorBufferInfo = {};
+	generatorBufferInfo.buffer = scene->GetMeshBuffer();
+	generatorBufferInfo.offset = 0;
+	generatorBufferInfo.range = scene->GetMeshBufferSize();
+
+	std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[0].dstSet = generatorDescriptorSet;
+	descriptorWrites[0].dstBinding = 0;
+	descriptorWrites[0].dstArrayElement = 0;
+	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	descriptorWrites[0].descriptorCount = 1;
+	descriptorWrites[0].pBufferInfo = &generatorBufferInfo;
+	descriptorWrites[0].pImageInfo = nullptr;
+	descriptorWrites[0].pTexelBufferView = nullptr;
+
+	VkDescriptorBufferInfo meshAttributesBufferInfo = {};
+	meshAttributesBufferInfo.buffer = scene->GetMeshAttributeBuffer();
+	meshAttributesBufferInfo.offset = 0;
+	meshAttributesBufferInfo.range = sizeof(int);
+
+	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[1].dstSet = generatorDescriptorSet;
+	descriptorWrites[1].dstBinding = 1;
+	descriptorWrites[1].dstArrayElement = 0;
+	descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrites[1].descriptorCount = 1;
+	descriptorWrites[1].pBufferInfo = &meshAttributesBufferInfo;
+	descriptorWrites[1].pImageInfo = nullptr;
+	descriptorWrites[1].pTexelBufferView = nullptr;
+
+	// Update descriptor sets
+	vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
 void Renderer::CreateCameraDescriptorSet() {
@@ -755,7 +843,7 @@ void Renderer::CreateGeneratorComputePipeline()
 	computeShaderStageInfo.module = computeShaderModule;
 	computeShaderStageInfo.pName = "main";
 
-	std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { sceneSDFDescriptorSetLayout, vectorFieldDescriptorSetLayout };
+	std::vector<VkDescriptorSetLayout> descriptorSetLayouts = { sceneSDFDescriptorSetLayout, vectorFieldDescriptorSetLayout, generatorDescriptorSetLayout };
 
 	// Create pipeline layout
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
@@ -1013,6 +1101,9 @@ void Renderer::RecordGeneratorComputeCommandBuffer()
 
 	// Bind descriptor set for vector field 
 	vkCmdBindDescriptorSets(generatorCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, generatorComputePipelineLayout, 1, 1, &vectorFieldDescriptorSet, 0, nullptr);
+
+	// Bind descriptor set for mesh data
+	vkCmdBindDescriptorSets(generatorCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, generatorComputePipelineLayout, 2, 1, &generatorDescriptorSet, 0, nullptr);
 
 	vkCmdDispatch(generatorCommandBuffer, 64, 64, 64);
 

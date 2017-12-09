@@ -3,9 +3,50 @@
 
 #define WORKGROUP_SIZE 8
 
+#define saturate(x) clamp(x, 0.0, 1.0)
+
+struct TriangleData {
+	vec3 v1, v2, v3;
+	vec4 v21, v32, v13;
+	vec4 normal;
+	vec3 t21, t32, t13;
+};
+
+//struct TriangleData {
+//	vec3 v1;
+//	float pad1;
+//	vec3 v2;
+//	float pad2;
+//	vec3 v3;
+//	float pad3;
+	
+//	vec4 v21, v32, v13;
+//	vec4 normal;
+//	vec3 t21;
+//	float pad4;
+//	vec3 t32;
+//	float pad5; 
+//	vec3 t13;
+//	float pad6;
+//};
+
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_z = WORKGROUP_SIZE) in;
+
 layout(set = 0, binding = 0, r32f) coherent uniform image3D MeshSDF;
 layout(set = 1, binding = 0, rgba8) coherent uniform image3D VectorField;
+
+layout(set = 2, binding = 0) buffer MeshTriangleArray {
+	TriangleData data[];
+};
+
+layout(set = 2, binding = 1) uniform MeshTriangleAttributes
+{
+	int size;
+};
+
+float dot2(vec3 v) {
+	return dot(v, v);
+}
 
 float vmax(vec3 v) {
 	return max(max(v.x, v.y), v.z);
@@ -32,8 +73,6 @@ float udBox(vec3 p, vec3 b)
 	return length(max(abs(p) - b, 0.0));
 }
 
-// TODO: build a parabola mixed with a plane to solve the 
-// grazing angle/boundary iteration problem
 float sdPlane( vec3 p)
 {
 	return p.y;
@@ -209,7 +248,6 @@ uint hash( uint x ) {
     x += ( x << 15u );
     return x;
 }
-
 
 // Construct a float with half-open range [0:1] using low 23 bits.
 // All zeroes yields 0.0, all ones yields the next smallest representable value below 1.0.
@@ -404,6 +442,51 @@ float randomSpheres(vec3 p)
 	return d;
 }
 
+// Reference: http://www.iquilezles.org/www/articles/triangledistance/triangledistance.htm
+float udTriangleSquared(in TriangleData t, in vec3 p) {
+
+	vec3 center = (t.v1 + t.v2 + t.v3) * .333;
+	float size = max(length(center - t.v1), max(length(center - t.v2), length(center - t.v3)));
+
+	float signed = -sign(dot(t.normal.xyz, p - center));
+
+	//if(length(p - center) > size)
+	//	return signed * (length(p-center) - size);
+
+	vec3 p1 = p - t.v1;
+    vec3 p2 = p - t.v2;
+    vec3 p3 = p - t.v3;
+
+	float insideFace = sign(dot(t.t21, p1)) + sign(dot(t.t32, p2)) + sign(dot(t.t13, p3));
+	float faceDistance = pow(dot(t.normal.xyz, p1), 2.0) * t.normal.w;
+	
+	float edgeDistance = min(min(
+                  dot2(t.v21.xyz * saturate(dot(t.v21.xyz, p1) * t.v21.w) - p1), 
+                  dot2(t.v32.xyz * saturate(dot(t.v32.xyz, p2) * t.v32.w) - p2)), 
+                  dot2(t.v13.xyz * saturate(dot(t.v13.xyz, p3) * t.v13.w) - p3));
+
+    //return (insideFace < 2.0) ? edgeDistance : signed * faceDistance;
+	return mix(signed * faceDistance, edgeDistance, step(insideFace, 2.0));
+}
+
+float generateMeshSDF(vec3 p)
+{
+	float minDistance = 50.0;
+
+	for(uint i = 0; i < 500; ++i) {
+		TriangleData t = data[i];
+
+		float d = udTriangleSquared(t, p);
+
+		//minDistance = min(abs(minDistance), abs(d));
+
+		if(abs(d) < abs(minDistance))
+			minDistance = d;
+	}
+	
+	return sqrt(abs(minDistance)) * sign(minDistance)  - .0015;
+}
+
 void main() {
 	
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
@@ -414,10 +497,9 @@ void main() {
 
 	//sdf -= sin(nPos.y * 32.0) * .1;
 	//sdf -= perlin3D(nPos * 8.0) * .02;
+	//nPos += perlin3D(nPos * 4.0) * .1;
 
-
-	nPos += perlin3D(nPos * 4.0) * .1;
-	float sdf = randomSpheres(nPos);
+	float sdf = generateMeshSDF(nPos);
 
 	imageStore(VectorField, coord, vec4(curl3D(nPos * 3.0 + vec3(.123, .64, 5.0), .01), perlin3D(nPos * 5.0)));
 

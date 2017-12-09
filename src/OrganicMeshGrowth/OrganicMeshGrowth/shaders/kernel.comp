@@ -295,5 +295,5 @@ void main() {
 	
 	delta += MAIN_DISPLACEMENT_FUNCTION(current);
 
-	imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
+	//imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
 }
