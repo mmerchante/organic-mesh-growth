@@ -20,35 +20,6 @@ struct Time {
     float totalTime = 0.0f;
 };
 
-struct CompactTriangle
-{
-	// Data
-	float e1x;
-	float e1y;
-	float e1z;
-
-	float e2x;
-	float e2y;
-	float e2z;
-
-	float p1x;
-	float p1y;
-	float p1z;
-
-	// Normals
-	float n1x;
-	float n1y;
-	float n1z;
-
-	float n2x;
-	float n2y;
-	float n2z;
-
-	float n3x;
-	float n3y;
-	float n3z;
-};
-
 struct CompactNode
 {
 	int leftNode;	// The index of the left node
@@ -106,8 +77,12 @@ public:
 	int maxDepth;
 	AABB meshBounds;
 	int maxLeafSize;
-	int * compactNodes;
-	int compactDataSize;
+	
+	CompactNode * compactNodes;
+	int compactNodeSize;
+
+	TriangleData * compactTriangles;
+	int compactTriangleSize;
 
 protected:
 	struct MeshNode
@@ -159,6 +134,12 @@ private:
 	void * meshMappedData;
 	int meshTriangleCount;
 
+	CompactNode * indexBufferObject;
+	VkBuffer indexBuffer;
+	VkDeviceMemory indexBufferMemory;
+	void * indexMappedData;
+	int indexCount;
+
 	int meshBufferSize;
 	VkBuffer meshAttributeBuffer;
 	VkDeviceMemory meshAttributeBufferMemory;
@@ -179,6 +160,7 @@ public:
     
     void AddModel(Model* model);
 
+
     VkBuffer GetTimeBuffer() const;
 
 	Texture3D* GetSceneSDF(int index);
@@ -186,6 +168,7 @@ public:
 
 	void LoadMesh(std::string filename);
 
+	VkBuffer GetMeshIndexBuffer();
 	VkBuffer GetMeshBuffer();
 	VkBuffer GetMeshAttributeBuffer();
 	int GetMeshBufferSize();
@@ -193,5 +176,5 @@ public:
 	void CreateVectorField();
 	Texture3D* GetVectorField();
 
-    void UpdateTime();
+    float UpdateTime();
 };

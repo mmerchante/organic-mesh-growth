@@ -12,6 +12,18 @@ struct TriangleData {
 	vec3 t21, t32, t13;
 };
 
+struct TreeNode
+{
+	int leftNode;	// The index of the left node
+	int rightNode;	// The index of the right node
+
+	int axis;		// The axis for this node
+	float split;	// The offset on this axis
+
+	int primitiveCount;			// The size of this leaf
+	int primitiveStartOffset;	// The offset where the triangles are
+};
+
 //struct TriangleData {
 //	vec3 v1;
 //	float pad1;
@@ -42,6 +54,10 @@ layout(set = 2, binding = 0) buffer MeshTriangleArray {
 layout(set = 2, binding = 1) uniform MeshTriangleAttributes
 {
 	int size;
+};
+
+layout(set = 2, binding = 2) buffer MeshIndexArray {
+	TreeNode indexData[];
 };
 
 float dot2(vec3 v) {
@@ -469,22 +485,85 @@ float udTriangleSquared(in TriangleData t, in vec3 p) {
 	return mix(signed * faceDistance, edgeDistance, step(insideFace, 2.0));
 }
 
+struct StackData
+{
+	int nodeOffset;
+	float minDistance;
+	float maxDistance;
+};
+
 float generateMeshSDF(vec3 p)
 {
-	float minDistance = 50.0;
+	float minDistance = 50000.0;
+	
+	StackData stack[64];
+	int stackTop = 0;
+	int currentNode = 0;
 
-	for(uint i = 0; i < 500; ++i) {
-		TriangleData t = data[i];
+	//float currentDistance = 1000000.0;
 
-		float d = udTriangleSquared(t, p);
+	// The stack approach is very similar to pbrtv3
+	while (currentNode != -1 && stackTop < 64)
+	{
+		//// If on a previous loop there was an intersection and is closer
+		//// than the current node min distance, don't even start checking intersections
+		//if (currentDistance < minDistance)
+		//	break;
 
-		//minDistance = min(abs(minDistance), abs(d));
+		TreeNode cNode = indexData[currentNode];
+		int leftNode = cNode.leftNode;
+		int rightNode = cNode.rightNode;
+		float split = cNode.split;
+		int axis = cNode.axis;
 
-		if(abs(d) < abs(minDistance))
-			minDistance = d;
+		// Leaf
+		if (leftNode == -1 && rightNode == -1)
+		{
+			int primitiveCount = cNode.primitiveCount;
+			int triangleOffset = cNode.primitiveStartOffset;
+			
+			// Check intersection with all primitives inside this node
+			for (int i = 0; i < primitiveCount; i++)
+			{
+				TriangleData triangle = data[triangleOffset + i];
+				float triangleDistance = udTriangleSquared(triangle, p);
+
+				if(abs(triangleDistance) < abs(minDistance))
+					minDistance = triangleDistance;
+			}
+
+			if(primitiveCount > 0)
+			{
+				// Because of the nature of our iteration,
+				// if we are in a leaf, we are sure we found something
+				break;
+			}
+			else if (stackTop > 0)
+			{
+				stackTop--;
+				currentNode = stack[stackTop].nodeOffset;
+			}
+			else break; // There's no other object in the stack, we finished iterating!
+		}
+		else
+		{
+			int nearNode = leftNode;
+			int farNode = rightNode;
+
+			if (p[axis] >= split)
+			{
+				nearNode = rightNode;
+				farNode = leftNode;
+			}
+
+			// We always check all children
+			stack[stackTop].nodeOffset = farNode;
+			stackTop++; // Increment the stack
+			currentNode = nearNode;
+		}
 	}
 	
-	return sqrt(abs(minDistance)) * sign(minDistance)  - .0015;
+	return sqrt(abs(minDistance)) * sign(minDistance) - .0015;
 }
 
 void main() {

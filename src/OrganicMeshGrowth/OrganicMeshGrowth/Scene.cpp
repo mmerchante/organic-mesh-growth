@@ -23,15 +23,17 @@ void Scene::AddModel(Model* model) {
     models.push_back(model);
 }
 
-void Scene::UpdateTime() {
+float Scene::UpdateTime() {
     high_resolution_clock::time_point currentTime = high_resolution_clock::now();
     duration<float> nextDeltaTime = duration_cast<duration<float>>(currentTime - startTime);
     startTime = currentTime;
 
-	time.deltaTime = .016;// nextDeltaTime.count();
+	time.deltaTime = nextDeltaTime.count();
     time.totalTime += time.deltaTime;
 
     memcpy(mappedData, &time, sizeof(Time));
+
+	return time.deltaTime;
 }
 
 void Scene::CreateSceneSDF()
@@ -115,6 +117,8 @@ void Scene::LoadMesh(const std::string filename)
 	int currentOffset = 0;
 	this->meshBufferObject = new TriangleData[meshTriangleCount];
 
+	std::vector<Triangle*> triangles;
+
 	for (int m = 0; m < shapes.size(); ++m)
 	{
 		int indexOffset = 0;
@@ -150,26 +154,33 @@ void Scene::LoadMesh(const std::string filename)
 				tri.v2 = (tri.v2 - centerPivot) / meshUniformSize;
 				tri.v3 = (tri.v3 - centerPivot) / meshUniformSize;
 
-				// Offsets
-				tri.v21 = glm::vec4(tri.v2 - tri.v1, 0.f);
-				tri.v32 = glm::vec4(tri.v3 - tri.v2, 0.f);
-				tri.v13 = glm::vec4(tri.v1 - tri.v3, 0.f);
+				//// Offsets
+				//tri.v21 = glm::vec4(tri.v2 - tri.v1, 0.f);
+				//tri.v32 = glm::vec4(tri.v3 - tri.v2, 0.f);
+				//tri.v13 = glm::vec4(tri.v1 - tri.v3, 0.f);
 
-				// Magnitudes
-				tri.v21.w = 1.f / glm::dot(tri.v21, tri.v21);
-				tri.v32.w = 1.f / glm::dot(tri.v32, tri.v32);
-				tri.v13.w = 1.f / glm::dot(tri.v13, tri.v13);
+				//// Magnitudes
+				//tri.v21.w = 1.f / glm::dot(tri.v21, tri.v21);
+				//tri.v32.w = 1.f / glm::dot(tri.v32, tri.v32);
+				//tri.v13.w = 1.f / glm::dot(tri.v13, tri.v13);
 
-				// Unnormalized normal
-				tri.normal = glm::vec4(glm::cross(glm::vec3(tri.v21), glm::vec3(tri.v13)), 0.f);
-				tri.normal.w = 1.f / glm::dot(tri.normal, tri.normal);
+				//// Unnormalized normal
+				//tri.normal = glm::vec4(glm::cross(glm::vec3(tri.v21), glm::vec3(tri.v13)), 0.f);
+				//tri.normal.w = 1.f / glm::dot(tri.normal, tri.normal);
 
-				tri.t21 = glm::cross(glm::vec3(tri.v21), glm::vec3(tri.normal));
-				tri.t32 = glm::cross(glm::vec3(tri.v32), glm::vec3(tri.normal));
-				tri.t13 = glm::cross(glm::vec3(tri.v13), glm::vec3(tri.normal));
+				//tri.t21 = glm::cross(glm::vec3(tri.v21), glm::vec3(tri.normal));
+				//tri.t32 = glm::cross(glm::vec3(tri.v32), glm::vec3(tri.normal));
+				//tri.t13 = glm::cross(glm::vec3(tri.v13), glm::vec3(tri.normal));
 
 				this->meshBufferObject[currentOffset] = tri;
 				currentOffset++;
+
+				Triangle * fullTri = new Triangle();
+				fullTri->p1 = tri.v1;
+				fullTri->p2 = tri.v2;
+				fullTri->p3 = tri.v3;
+
+				triangles.push_back(fullTri);
 			}
 			else
 			{
@@ -179,20 +190,36 @@ void Scene::LoadMesh(const std::string filename)
 		}
 	}
 
-	this->meshBufferSize = sizeof(TriangleData) * meshTriangleCount;
+	Mesh kdMesh(15, 5, triangles);
+	kdMesh.Build();
+
+	//this->meshBufferSize = sizeof(TriangleData) * meshTriangleCount;
+	this->meshBufferSize = kdMesh.compactTriangleSize;
 
 	//std::cout << centerPivot.x << ", " << centerPivot.y << ", " << centerPivot.z << std::endl;
 	//std::cout << meshUniformSize << std::endl;
 	//std::cout << "sizeof(TriangleData) " << sizeof(TriangleData) << std::endl;
 	std::cout << "Loaded " << filename << " with " << meshTriangleCount << " triangles" << std::endl;
 
-	BufferUtils::CreateBuffer(device, meshBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, meshBuffer, meshBufferMemory);
-	vkMapMemory(device->GetVkDevice(), meshBufferMemory, 0, meshBufferSize, 0, &meshMappedData);
-	memcpy(meshMappedData, meshBufferObject, meshBufferSize);
+	// Triangle buffer
+	BufferUtils::CreateBuffer(device, kdMesh.compactTriangleSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, meshBuffer, meshBufferMemory);
+	vkMapMemory(device->GetVkDevice(), meshBufferMemory, 0, kdMesh.compactTriangleSize, 0, &meshMappedData);
+	memcpy(meshMappedData, kdMesh.compactTriangles, kdMesh.compactTriangleSize);
 
+	// kd-tree index buffer
+	BufferUtils::CreateBuffer(device, kdMesh.compactNodeSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, indexBuffer, indexBufferMemory);
+	vkMapMemory(device->GetVkDevice(), indexBufferMemory, 0, kdMesh.compactNodeSize, 0, &indexMappedData);
+	memcpy(indexMappedData, kdMesh.compactNodes, kdMesh.compactNodeSize);
+
+	// Mesh attributes buffer
 	BufferUtils::CreateBuffer(device, sizeof(int), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, meshAttributeBuffer, meshAttributeBufferMemory);
 	vkMapMemory(device->GetVkDevice(), meshAttributeBufferMemory, 0, sizeof(int), 0, &meshAttributeMappedData);
 	memcpy(meshAttributeMappedData, &this->meshTriangleCount, sizeof(int));
+}
+
+VkBuffer Scene::GetMeshIndexBuffer()
+{
+	return indexBuffer;
 }
 
 VkBuffer Scene::GetMeshBuffer()
@@ -269,6 +296,10 @@ Scene::~Scene() {
 	vkUnmapMemory(device->GetVkDevice(), meshBufferMemory);
 	vkDestroyBuffer(device->GetVkDevice(), meshBuffer, nullptr);
 	vkFreeMemory(device->GetVkDevice(), meshBufferMemory, nullptr);
+
+	vkUnmapMemory(device->GetVkDevice(), indexBufferMemory);
+	vkDestroyBuffer(device->GetVkDevice(), indexBuffer, nullptr);
+	vkFreeMemory(device->GetVkDevice(), indexBufferMemory, nullptr);
 
 	vkUnmapMemory(device->GetVkDevice(), meshAttributeBufferMemory);
 	vkDestroyBuffer(device->GetVkDevice(), meshAttributeBuffer, nullptr);
@@ -484,27 +515,29 @@ float Mesh::MeshNode::GetSplitPoint(const std::vector<Triangle *> &triangles, fl
 
 	objMedian /= triangles.size();
 
-	float step = (center - objMedian) / SAH_SUBDIV;
+	//float step = (center - objMedian) / SAH_SUBDIV;
 
-	float minCost = std::numeric_limits<float>::infinity();
-	float result = objMedian;
+	//float minCost = std::numeric_limits<float>::infinity();
+	//float result = objMedian;
 
-	if (glm::abs(step) > glm::epsilon<float>())
-	{
-		// i is the proposed split point
-		for (float i = objMedian; i < center; i += step)
-		{
-			float cost = CostFunction(i, triangles, minAxis, maxAxis);
+	//if (glm::abs(step) > glm::epsilon<float>())
+	//{
+	//	// i is the proposed split point
+	//	for (float i = objMedian; i < center; i += step)
+	//	{
+	//		float cost = CostFunction(i, triangles, minAxis, maxAxis);
 
-			if (minCost > cost)
-			{
-				minCost = cost;
-				result = i;
-			}
-		}
-	}
+	//		if (minCost > cost)
+	//		{
+	//			minCost = cost;
+	//			result = i;
+	//		}
+	//	}
+	//}
 
-	return result;
+	// return result;
+
+	return (center + objMedian) * .5f;
 }
 
 int Mesh::MeshNode::GetNodeCount()
@@ -547,6 +580,10 @@ Mesh::~Mesh()
 
 	if (this->compactNodes != nullptr)
 		delete[] this->compactNodes;
+
+
+	if (this->compactTriangles != nullptr)
+		delete[] this->compactTriangles;
 }
 
 AABB Mesh::CalculateAABB()
@@ -575,38 +612,37 @@ void Mesh::Build()
 	meshBounds = this->CalculateAABB();
 	this->root = new MeshNode(triangles, meshBounds.min, meshBounds.max, 0, this->maxDepth, this->maxLeafSize);
 
-	std::cout << this->root->GetDepth() << " tree depth" << std::endl;
-	std::cout << this->root->GetNodeCount() << " tree nodes" << std::endl;
-	std::cout << this->root->TriangleCount() << " total elements in tree" << std::endl;
+	std::cout << "---------------------------------------------" << std::endl;
+	std::cout << "kd-tree depth " << this->root->GetDepth() << std::endl;
+	std::cout << "kd-tree node count " << this->root->GetNodeCount() << std::endl;
+	std::cout << "kd-tree triangle count " << this->root->TriangleCount() << std::endl;
 
 	this->Compact();
+
+	std::cout << "---------------------------------------------" << std::endl;
 }
 
 void Mesh::Compact()
 {
 	int nodeCount = this->root->GetNodeCount();
-	int elements = this->root->TriangleCount();
+	int triangleCount = this->root->TriangleCount();
+	
+	this->compactNodes = new CompactNode[nodeCount];
+	this->compactTriangles = new TriangleData[triangleCount];
 
-	// Left, right, split, axis, primitiveCount
-	int nodeSize = 4 + 4 + 4 + 4 + 4;
-	int elementSize = sizeof(CompactTriangle);
+	this->compactNodeSize = nodeCount * sizeof(CompactNode);
+	this->compactTriangleSize = triangleCount * sizeof(TriangleData);
 
-	this->compactDataSize = (nodeCount * nodeSize) + (elements * elementSize);
-	this->compactNodes = (int*)std::malloc(compactDataSize);
-
-	int mb = compactDataSize / (1024 * 1024);
-	std::cout << "Compact mesh kd-tree memory size: " << mb << " megabytes" << std::endl;
-
-	if (this->compactNodes == nullptr)
-		std::cerr << "Could not allocate " << mb << " megabytes" << std::endl;
+	int totalMemory = compactNodeSize + compactTriangleSize;
+	std::cout << "kd-tree node memory: " << (int)(compactNodeSize / (1024.f)) << " kb" << std::endl;
+	std::cout << "Total compact kd-tree memory: " << (int)(totalMemory / (1024.f * 1024.f)) << " MB" << std::endl;
 
 	std::stack<MeshNode*> stack;
 	stack.push(this->root);
 
 	int offset = 0;
+	int triangleOffset = 0;
 
-	// For compaction, we need to remember the original placement of nodes in parent
-	// nodes because we can't really know the offset until we build everything.
 	while (!stack.empty())
 	{
 		MeshNode * node = stack.top();
@@ -617,72 +653,73 @@ void Mesh::Compact()
 
 		// If this node is the child of a parent, let's set the current offset
 		if (node->parentOffset != -1)
-			compactNodes[node->parentOffset] = offset;
+		{
+			int left = node->parentOffset % 2 == 0;
+			int parentOffset = node->parentOffset / 2;
+			//compactNodes[node->parentOffset] = offset;
 
-		int baseOffset = offset;
+			if (left)
+				compactNodes[parentOffset].leftNode = offset;
+			else
+				compactNodes[parentOffset].rightNode = offset;
+		}
 
-		CompactNode * cNode = (CompactNode*)(compactNodes + offset);
-		cNode->leftNode = -1;
-		cNode->rightNode = -1;
-		cNode->split = node->split;
-		cNode->axis = node->axis;
+		CompactNode & cNode = compactNodes[offset];
+		cNode.leftNode = -1;
+		cNode.rightNode = -1;
+		cNode.split = node->split;
+		cNode.axis = node->axis;
 
 		if (node->IsLeaf())
 		{
-			cNode->primitiveCount = node->nodeTriangles.size();
-			offset += 5;
+			cNode.primitiveCount = node->nodeTriangles.size();
+			cNode.primitiveStartOffset = triangleOffset;
 
-			float * triData = (float*)compactNodes;
 			int triCount = node->nodeTriangles.size();
 
 			for (int i = 0; i < triCount; i++)
 			{
 				Triangle * triangle = node->nodeTriangles[i];
+				TriangleData & tri = compactTriangles[triangleOffset + i];
 
-				glm::vec3 e1 = triangle->p2 - triangle->p1;
-				glm::vec3 e2 = triangle->p3 - triangle->p1;
-				glm::vec3 p = triangle->p1;
+				// v1
+				tri.v1 = triangle->p1;
+				tri.v2 = triangle->p2;
+				tri.v3 = triangle->p3;
 
-				// e1
-				triData[offset++] = e1.x;
-				triData[offset++] = e1.y;
-				triData[offset++] = e1.z;
+				// Offsets
+				tri.v21 = glm::vec4(tri.v2 - tri.v1, 0.f);
+				tri.v32 = glm::vec4(tri.v3 - tri.v2, 0.f);
+				tri.v13 = glm::vec4(tri.v1 - tri.v3, 0.f);
 
-				// e2
-				triData[offset++] = e2.x;
-				triData[offset++] = e2.y;
-				triData[offset++] = e2.z;
+				// Magnitudes
+				tri.v21.w = 1.f / glm::dot(tri.v21, tri.v21);
+				tri.v32.w = 1.f / glm::dot(tri.v32, tri.v32);
+				tri.v13.w = 1.f / glm::dot(tri.v13, tri.v13);
 
-				// p1
-				triData[offset++] = triangle->p1.x;
-				triData[offset++] = triangle->p1.y;
-				triData[offset++] = triangle->p1.z;
+				// Unnormalized normal
+				tri.normal = glm::vec4(glm::cross(glm::vec3(tri.v21), glm::vec3(tri.v13)), 0.f);
+				tri.normal.w = 1.f / glm::dot(tri.normal, tri.normal);
 
-				// Normals
-				triData[offset++] = triangle->n1.x;
-				triData[offset++] = triangle->n1.y;
-				triData[offset++] = triangle->n1.z;
-
-				triData[offset++] = triangle->n2.x;
-				triData[offset++] = triangle->n2.y;
-				triData[offset++] = triangle->n2.z;
-
-				triData[offset++] = triangle->n3.x;
-				triData[offset++] = triangle->n3.y;
-				triData[offset++] = triangle->n3.z;
+				tri.t21 = glm::cross(glm::vec3(tri.v21), glm::vec3(tri.normal));
+				tri.t32 = glm::cross(glm::vec3(tri.v32), glm::vec3(tri.normal));
+				tri.t13 = glm::cross(glm::vec3(tri.v13), glm::vec3(tri.normal));
 			}
+
+			triangleOffset += triCount;
 		}
 		else
 		{
-			cNode->primitiveCount = 0;
-			offset += 5;
+			cNode.primitiveCount = 0;
 
-			node->left->parentOffset = baseOffset;
-			node->right->parentOffset = baseOffset + 1;
+			node->left->parentOffset = offset * 2;
+			node->right->parentOffset = offset * 2 + 1;
 
 			stack.push(node->left);
 			stack.push(node->right);
 		}
+
+		offset++;
 	}
 
 	// Now that everything is copied and compacted, we can delete our root

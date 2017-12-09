@@ -215,7 +215,14 @@ void Renderer::CreateGeneratorDescriptorSetLayout()
 	sizeLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	sizeLayoutBinding.pImmutableSamplers = nullptr;
 
-    std::vector<VkDescriptorSetLayoutBinding> bindings = { storageLayoutBinding, sizeLayoutBinding };
+	VkDescriptorSetLayoutBinding indexLayoutBinding = {};
+	indexLayoutBinding.binding = 2;
+	indexLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	indexLayoutBinding.descriptorCount = 1;
+	indexLayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	indexLayoutBinding.pImmutableSamplers = nullptr;
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings = { storageLayoutBinding, sizeLayoutBinding, indexLayoutBinding };
 
     // Create the descriptor set layout
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
@@ -316,7 +323,7 @@ void Renderer::CreateDescriptorPool() {
 		// Mesh attribute buffer
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , 1 },
 
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2}
     };
 
     VkDescriptorPoolCreateInfo poolInfo = {};
@@ -351,7 +358,7 @@ void Renderer::CreateGeneratorDescriptorSet()
 	generatorBufferInfo.offset = 0;
 	generatorBufferInfo.range = scene->GetMeshBufferSize();
 
-	std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+	std::array<VkWriteDescriptorSet, 3> descriptorWrites = {};
 	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptorWrites[0].dstSet = generatorDescriptorSet;
 	descriptorWrites[0].dstBinding = 0;
@@ -376,6 +383,21 @@ void Renderer::CreateGeneratorDescriptorSet()
 	descriptorWrites[1].pBufferInfo = &meshAttributesBufferInfo;
 	descriptorWrites[1].pImageInfo = nullptr;
 	descriptorWrites[1].pTexelBufferView = nullptr;
+
+	VkDescriptorBufferInfo indexAttributesBufferInfo = {};
+	indexAttributesBufferInfo.buffer = scene->GetMeshIndexBuffer();
+	indexAttributesBufferInfo.offset = 0;
+	indexAttributesBufferInfo.range = VK_WHOLE_SIZE;
+
+	descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrites[2].dstSet = generatorDescriptorSet;
+	descriptorWrites[2].dstBinding = 2;
+	descriptorWrites[2].dstArrayElement = 0;
+	descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	descriptorWrites[2].descriptorCount = 1;
+	descriptorWrites[2].pBufferInfo = &indexAttributesBufferInfo;
+	descriptorWrites[2].pImageInfo = nullptr;
+	descriptorWrites[2].pTexelBufferView = nullptr;
 
 	// Update descriptor sets
 	vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);

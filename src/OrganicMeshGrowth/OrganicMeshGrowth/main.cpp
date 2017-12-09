@@ -6,6 +6,7 @@
 #include "Camera.h"
 #include "Scene.h"
 #include "Image.h"
+#include <iostream>
 
 Device* device;
 SwapChain* swapChain;
@@ -182,10 +183,14 @@ int main() {
     scene->AddModel(cube);
 	scene->CreateSceneSDF();
 	scene->CreateVectorField();
-	scene->LoadMesh("meshes/bunny.obj");
+	scene->LoadMesh("meshes/dragon.obj");
 
     renderer = new Renderer(device, swapChain, scene, camera);
 	renderer->GenerateSceneSDF();
+
+	float delta = scene->UpdateTime();
+
+	std::cout << "SDF generated in " << delta << " seconds " << std::endl;
 	
     glfwSetWindowSizeCallback(GetGLFWWindow(), resizeCallback);
     glfwSetMouseButtonCallback(GetGLFWWindow(), mouseDownCallback);
