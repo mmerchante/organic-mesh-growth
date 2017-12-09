@@ -183,7 +183,7 @@ int main() {
     scene->AddModel(cube);
 	scene->CreateSceneSDF();
 	scene->CreateVectorField();
-	scene->LoadMesh("meshes/dragon.obj");
+	scene->LoadMesh("meshes/eurydice.obj");
 
     renderer = new Renderer(device, swapChain, scene, camera);
 	renderer->GenerateSceneSDF();
