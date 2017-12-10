@@ -2,11 +2,13 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 #define WORKGROUP_SIZE 8
-#define SDF_TEXTURE_SIZE 512
+#define SDF_TEXTURE_SIZE 256
 #define TWO_PI 6.28318530718
 
+//#define SHARED_MEMORY
+
 #define MOLTEN_CORE
-#define SHARED_MEMORY
+
 #ifdef SHARED_MEMORY
 	#define SHARED_MEMORY_NORMALS
 #endif
@@ -14,7 +16,7 @@
 #ifdef MOLTEN_CORE
 	#define MAIN_DISPLACEMENT_FUNCTION moltenCoreDisplacement
 	#define KERNEL_DISPLACEMENT_FUNCTION moltenCoreKernel
-	#define KERNEL_HALF_SIZE 4
+	#define KERNEL_HALF_SIZE 1
 #elif BISMUTH
 
 #endif
@@ -228,7 +230,7 @@ float moltenCoreKernel(CurrentState current, KernelInput kInput) {
 
 float curvatureDisplacement(CurrentState current, float strength) {
 	//vec3 c = sdfCurvature(current.coord, 15);
-	float c = curv2(current.coord, 10);
+	float c = curv2(current.coord, 20);
 	//float d = max(0.0, -dot(c, current.normal)) * -strength * deltaTime;
 	return max(0.0, c) * -strength * deltaTime;
 }
@@ -276,7 +278,7 @@ float moltenCoreDisplacement(CurrentState current) {
 	float gravity = gravityDisplacement(current, 10.0) * activation(current.sdf, -.1, .6);
 	//return repulsion + curvature + expansion - gravityDisplacement(current, 1.0) * activation(current.sdf, 0.0, .1);
 
-	return repulsion + noise;// gravity + repulsion; 
+	return repulsion + curvature;// gravity + repulsion; 
 }
 
 /**************************************************************
@@ -365,5 +367,5 @@ void main() {
 	
 	delta += MAIN_DISPLACEMENT_FUNCTION(current);
 
-	imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
+	//imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
 }

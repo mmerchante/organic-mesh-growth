@@ -66,8 +66,8 @@ vec3 sdf_viz(vec3 rO, vec3 rD)
 		return CLEAR_COLOR;
 
 	p.y += .5;
-    float d = sdf(p) * 24.0;
-    return mix(CLEAR_COLOR, CLEAR_COLOR * 2.0, (smoothstep(.1, .2, mod(d, 1.0)) * .5));
+    float d = sdf(p) * 12.0;
+    return mix(CLEAR_COLOR, CLEAR_COLOR * 8.0, (smoothstep(.1, .2, mod(d, 1.0)) * .5));
 }
 
 #define AO_ITERATIONS 15

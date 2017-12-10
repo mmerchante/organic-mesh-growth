@@ -4,7 +4,7 @@
 #include <stack>
 #include <glm/gtc/constants.hpp>
 
-#define SAH_SUBDIV 15
+#define SAH_SUBDIV 200
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
@@ -71,7 +71,7 @@ void Scene::CreateSceneSDF()
 	samplerInfo.maxLod = 0.0f;
 
 	for (int i = 0; i < 2; ++i) {
-		sceneSDF.push_back(new Texture3D(device, 512, 512, 512, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo));
+		sceneSDF.push_back(new Texture3D(device, 256, 256, 256, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo));
 	}
 }
 
@@ -154,24 +154,6 @@ void Scene::LoadMesh(const std::string filename)
 				tri.v2 = (tri.v2 - centerPivot) / meshUniformSize;
 				tri.v3 = (tri.v3 - centerPivot) / meshUniformSize;
 
-				//// Offsets
-				//tri.v21 = glm::vec4(tri.v2 - tri.v1, 0.f);
-				//tri.v32 = glm::vec4(tri.v3 - tri.v2, 0.f);
-				//tri.v13 = glm::vec4(tri.v1 - tri.v3, 0.f);
-
-				//// Magnitudes
-				//tri.v21.w = 1.f / glm::dot(tri.v21, tri.v21);
-				//tri.v32.w = 1.f / glm::dot(tri.v32, tri.v32);
-				//tri.v13.w = 1.f / glm::dot(tri.v13, tri.v13);
-
-				//// Unnormalized normal
-				//tri.normal = glm::vec4(glm::cross(glm::vec3(tri.v21), glm::vec3(tri.v13)), 0.f);
-				//tri.normal.w = 1.f / glm::dot(tri.normal, tri.normal);
-
-				//tri.t21 = glm::cross(glm::vec3(tri.v21), glm::vec3(tri.normal));
-				//tri.t32 = glm::cross(glm::vec3(tri.v32), glm::vec3(tri.normal));
-				//tri.t13 = glm::cross(glm::vec3(tri.v13), glm::vec3(tri.normal));
-
 				this->meshBufferObject[currentOffset] = tri;
 				currentOffset++;
 
@@ -190,7 +172,7 @@ void Scene::LoadMesh(const std::string filename)
 		}
 	}
 
-	Mesh kdMesh(15, 5, triangles);
+	Mesh kdMesh(9, 5, triangles);
 	kdMesh.Build();
 
 	//this->meshBufferSize = sizeof(TriangleData) * meshTriangleCount;
@@ -271,7 +253,7 @@ void Scene::CreateVectorField()
 	samplerInfo.minLod = 0.0f;
 	samplerInfo.maxLod = 0.0f;
 
-	this->vectorFieldTexture = new Texture3D(device, 512, 512, 512, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo);
+	this->vectorFieldTexture = new Texture3D(device, 256, 256, 256, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo);
 }
 
 Texture3D * Scene::GetVectorField()
@@ -515,10 +497,10 @@ float Mesh::MeshNode::GetSplitPoint(const std::vector<Triangle *> &triangles, fl
 
 	objMedian /= triangles.size();
 
-	//float step = (center - objMedian) / SAH_SUBDIV;
+	float step = (center - objMedian) / SAH_SUBDIV;
 
-	//float minCost = std::numeric_limits<float>::infinity();
-	//float result = objMedian;
+	float minCost = std::numeric_limits<float>::infinity();
+	float result = objMedian;
 
 	//if (glm::abs(step) > glm::epsilon<float>())
 	//{
@@ -636,6 +618,7 @@ void Mesh::Compact()
 	int totalMemory = compactNodeSize + compactTriangleSize;
 	std::cout << "kd-tree node memory: " << (int)(compactNodeSize / (1024.f)) << " kb" << std::endl;
 	std::cout << "Total compact kd-tree memory: " << (int)(totalMemory / (1024.f * 1024.f)) << " MB" << std::endl;
+	std::cout << "Sizeof compact node " << sizeof(CompactNode) << std::endl;
 
 	std::stack<MeshNode*> stack;
 	stack.push(this->root);

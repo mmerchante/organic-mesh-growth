@@ -22,14 +22,16 @@ struct Time {
 
 struct CompactNode
 {
-	int leftNode;	// The index of the left node
-	int rightNode;	// The index of the right node
+	GLM_ALIGN(4) int leftNode;	// The index of the left node
+	GLM_ALIGN(4) int rightNode;	// The index of the right node
 
-	int axis;		// The axis for this node
-	float split;	// The offset on this axis
+	GLM_ALIGN(4) int axis;		// The axis for this node
+	GLM_ALIGN(4) float split;	// The offset on this axis
 
-	int primitiveCount;			// The size of this leaf
-	int primitiveStartOffset;	// The offset where the triangles are
+	GLM_ALIGN(4) int primitiveCount;			// The size of this leaf
+	GLM_ALIGN(4) int primitiveStartOffset;	// The offset where the triangles are
+
+	GLM_ALIGN(4) int pad1, pad2;
 };
 
 class AABB
