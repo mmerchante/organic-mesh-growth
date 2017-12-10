@@ -111,7 +111,7 @@ void Scene::LoadMesh(const std::string filename)
 	}
 
 	glm::vec3 centerPivot = (maxBounds + minBounds) * .5f;
-	glm::vec3 meshSize = glm::abs((maxBounds - minBounds) * .75f);
+	glm::vec3 meshSize = glm::abs((maxBounds - minBounds) * .5f);
 	float meshUniformSize = glm::max(meshSize.x, glm::max(meshSize.y, meshSize.z)) + .00001;
 	
 	int currentOffset = 0;

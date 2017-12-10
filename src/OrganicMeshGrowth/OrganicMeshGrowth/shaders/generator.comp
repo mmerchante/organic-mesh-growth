@@ -461,13 +461,10 @@ float randomSpheres(vec3 p)
 // Reference: http://www.iquilezles.org/www/articles/triangledistance/triangledistance.htm
 float udTriangleSquared(in TriangleData t, in vec3 p) {
 
-	vec3 center = (t.v1 + t.v2 + t.v3) * .333;
-	float size = max(length(center - t.v1), max(length(center - t.v2), length(center - t.v3)));
+	vec3 center = (t.v1 + t.v2 + t.v3) * .3333333;
 
-	float signed = -sign(dot(t.normal.xyz, p - center));
-
-	//if(length(p - center) > size)
-	//	return signed * (length(p-center) - size);
+	float signed = -sign(dot(t.normal.xyz, p - t.v1));
+	float signAlt = -sign(dot(t.normal.xyz, p - center));
 
 	vec3 p1 = p - t.v1;
     vec3 p2 = p - t.v2;
@@ -482,7 +479,7 @@ float udTriangleSquared(in TriangleData t, in vec3 p) {
                   dot2(t.v13.xyz * saturate(dot(t.v13.xyz, p3) * t.v13.w) - p3));
 
     //return (insideFace < 2.0) ? edgeDistance : signed * faceDistance;
-	return mix(signed * faceDistance, edgeDistance, step(insideFace, 2.0));
+	return mix(signed * faceDistance, signed * edgeDistance, step(insideFace, 2.0));
 }
 
 struct StackData
@@ -494,21 +491,21 @@ struct StackData
 
 float generateMeshSDF(vec3 p)
 {
-	float minDistance = 50000.0;
+	float minDistance = -1000000.0;
 	
 	StackData stack[64];
 	int stackTop = 0;
 	int currentNode = 0;
 
-	//float currentDistance = 1000000.0;
+	float currentDistance = 1000000.0;
 
 	// The stack approach is very similar to pbrtv3
 	while (currentNode != -1 && stackTop < 64)
 	{
-		//// If on a previous loop there was an intersection and is closer
-		//// than the current node min distance, don't even start checking intersections
-		//if (currentDistance < minDistance)
-		//	break;
+		// If on a previous loop there was an intersection and is closer
+		// than the current node min distance, don't even start checking intersections
+		if (currentDistance * .945 < minDistance)
+			break;
 
 		TreeNode cNode = indexData[currentNode];
 		int leftNode = cNode.leftNode;
@@ -528,42 +525,50 @@ float generateMeshSDF(vec3 p)
 				TriangleData triangle = data[triangleOffset + i];
 				float triangleDistance = udTriangleSquared(triangle, p);
 
-				if(abs(triangleDistance) < abs(minDistance))
-					minDistance = triangleDistance;
+				if(abs(triangleDistance) < abs(currentDistance))
+					currentDistance = triangleDistance;
 			}
 
-			if(primitiveCount > 0)
+			/*if(primitiveCount > 0)
 			{
 				// Because of the nature of our iteration,
 				// if we are in a leaf, we are sure we found something
 				break;
 			}
-			else if (stackTop > 0)
+			else*/ if (stackTop > 0)
 			{
 				stackTop--;
 				currentNode = stack[stackTop].nodeOffset;
+				minDistance = stack[stackTop].minDistance;
 			}
 			else break; // There's no other object in the stack, we finished iterating!
 		}
 		else
 		{
-			int nearNode = leftNode;
-			int farNode = rightNode;
+			float t = abs(split - p[axis]);
+			int nearNode = -1;
+			int farNode = -1;
 
 			if (p[axis] >= split)
 			{
 				nearNode = rightNode;
 				farNode = leftNode;
 			}
+			else
+			{
+				nearNode = leftNode;
+				farNode = rightNode;
+			}
 
 			// We always check all children
 			stack[stackTop].nodeOffset = farNode;
+			stack[stackTop].minDistance = t;
 			stackTop++; // Increment the stack
 			currentNode = nearNode;
 		}
 	}
 	
-	return sqrt(abs(minDistance)) * sign(minDistance) - .0015;
+	return sqrt(abs(currentDistance)) * sign(currentDistance);// - .0115;
 }
 
 void main() {
