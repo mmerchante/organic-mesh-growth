@@ -7,11 +7,14 @@
 
 #define MOLTEN_CORE
 #define SHARED_MEMORY
+#ifdef SHARED_MEMORY
+	#define SHARED_MEMORY_NORMALS
+#endif
 
 #ifdef MOLTEN_CORE
 	#define MAIN_DISPLACEMENT_FUNCTION moltenCoreDisplacement
 	#define KERNEL_DISPLACEMENT_FUNCTION moltenCoreKernel
-	#define KERNEL_HALF_SIZE 2
+	#define KERNEL_HALF_SIZE 4
 #elif BISMUTH
 
 #endif
@@ -80,9 +83,15 @@ float activation(float sdf, float min, float max) {
 vec3 sdfNormal(ivec3 pos, int offset) {
 	ivec2 eps = ivec2(offset, 0);
 
+#ifdef SHARED_MEMORY_NORMALS
+	float dx = sharedSDF(pos + eps.xyy, pos) - sharedSDF(pos - eps.xyy, pos);
+	float dy = sharedSDF(pos + eps.yxy, pos) - sharedSDF(pos - eps.yxy, pos);
+	float dz = sharedSDF(pos + eps.yyx, pos) - sharedSDF(pos - eps.yyx, pos);
+#else
 	float dx = sdf(pos + eps.xyy) - sdf(pos - eps.xyy);
 	float dy = sdf(pos + eps.yxy) - sdf(pos - eps.yxy);
 	float dz = sdf(pos + eps.yyx) - sdf(pos - eps.yyx);
+#endif
 
 	return normalize(vec3(dx, dy, dz));
 }
@@ -210,7 +219,7 @@ float relaxation(CurrentState current, KernelInput kInput, float strength) {
 
 float moltenCoreKernel(CurrentState current, KernelInput kInput) {
 	//float perlin = imageLoad(VectorField, current.coord).a;
-	return relaxation(current, kInput, 1.5) * deltaTime * 50.0;
+	return relaxation(current, kInput, 1.5) * deltaTime;
 }
 
 /**************************************************************
@@ -356,5 +365,5 @@ void main() {
 	
 	delta += MAIN_DISPLACEMENT_FUNCTION(current);
 
-	//imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
+	imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
 }
