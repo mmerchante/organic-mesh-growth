@@ -75,7 +75,7 @@ void Scene::CreateSceneSDF()
 	}
 }
 
-void Scene::LoadMesh(const std::string filename)
+void Scene::LoadMesh(const std::string filename, float scaleMultiplier)
 {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -111,7 +111,7 @@ void Scene::LoadMesh(const std::string filename)
 	}
 
 	glm::vec3 centerPivot = (maxBounds + minBounds) * .5f;
-	glm::vec3 meshSize = glm::abs((maxBounds - minBounds) * .5f);
+	glm::vec3 meshSize = glm::abs((maxBounds - minBounds) * .5f / scaleMultiplier);
 	float meshUniformSize = glm::max(meshSize.x, glm::max(meshSize.y, meshSize.z)) + .00001;
 	
 	int currentOffset = 0;

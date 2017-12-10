@@ -18,6 +18,7 @@ struct TriangleData {
 struct Time {
     float deltaTime = 0.0f;
     float totalTime = 0.0f;
+	float simulationDeltaTime = 0.0001f;
 };
 
 struct CompactNode
@@ -168,7 +169,7 @@ public:
 	Texture3D* GetSceneSDF(int index);
 	void CreateSceneSDF();
 
-	void LoadMesh(std::string filename);
+	void LoadMesh(std::string filename, float scaleMultiplier);
 
 	VkBuffer GetMeshIndexBuffer();
 	VkBuffer GetMeshBuffer();

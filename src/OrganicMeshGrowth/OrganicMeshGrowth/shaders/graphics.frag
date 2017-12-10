@@ -135,7 +135,7 @@ void main()
 		// Sphere lit
 		vec3 ssNormal = (camera.view * vec4(normal, 0.0)).xyz * vec3(1.0, -1.0, 1.0) * .5 + .5;
 		outColor = texture(texSampler, ssNormal.xy);
-		//outColor = vec4(curv2(pos, .1)) * .5;
+		//outColor = vec4(curv2(pos, .025)) * .5;
 
 		//outColor = texture(vectorFieldSampler, pos * .5 + .5);
 	}

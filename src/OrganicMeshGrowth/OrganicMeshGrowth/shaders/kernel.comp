@@ -35,6 +35,7 @@ layout(set = 0, binding = 0) uniform CameraBufferObject {
 layout(set = 1, binding = 0) uniform Time {
     float deltaTime;
     float totalTime;
+	float simulationDeltaTime;
 };
 
 layout(set = 2, binding = 0, r32f) coherent uniform image3D SourceMeshSDF;
@@ -76,8 +77,9 @@ float sdf(ivec3 p) {
 	return imageLoad(SourceMeshSDF, p).x;
 }
 
-float activation(float sdf, float min, float max) {
-	float x = clamp((sdf - min) / (max - min), 0.0, 1.0);
+float activation(float sdf, float sdfMin, float sdfMax) {
+	//return clamp(1.0 / max(0.000001, abs(sdf)), 0.0, 1.0);
+	float x = clamp((sdf - sdfMin) / (sdfMax - sdfMin), 0.0, 1.0);
 	return clamp((1 + cos((x+.5)*6.28)) / 2.10, 0.0, 1.0);
 	//return clamp(1.0 - abs(smoothstep(min, max, sdf) - .5) / .5, 0.0, 1.0);
 }
@@ -151,7 +153,7 @@ vec3 curlSDF(ivec3 p, int offset)
 //		float curvatureGrowth = .05 * -NdotN * manhattanDistance;
 //		float borderGrowth = -(neighbor - sdf) * .35 * manhattanDistance;
 
-//		return activation * (curvatureGrowth + borderGrowth) * deltaTime * .1;
+//		return activation * (curvatureGrowth + borderGrowth) * simulationDeltaTime * .1;
 //	}
 
 //	return 0.0;
@@ -221,7 +223,7 @@ float relaxation(CurrentState current, KernelInput kInput, float strength) {
 
 float moltenCoreKernel(CurrentState current, KernelInput kInput) {
 	//float perlin = imageLoad(VectorField, current.coord).a;
-	return relaxation(current, kInput, 1.5) * deltaTime;
+	return 0.0;// relaxation(current, kInput, 10.5) * simulationDeltaTime;
 }
 
 /**************************************************************
@@ -230,9 +232,9 @@ float moltenCoreKernel(CurrentState current, KernelInput kInput) {
 
 float curvatureDisplacement(CurrentState current, float strength) {
 	//vec3 c = sdfCurvature(current.coord, 15);
-	float c = curv2(current.coord, 20);
-	//float d = max(0.0, -dot(c, current.normal)) * -strength * deltaTime;
-	return max(0.0, c) * -strength * deltaTime;
+	float c = curv2(current.coord, 25);
+	//float d = max(0.0, -dot(c, current.normal)) * -strength * simulationDeltaTime;
+	return max(0.0, c) * -strength * simulationDeltaTime;
 }
 
 float repulsionDisplacement(CurrentState current, float delta, float strength) {
@@ -247,38 +249,49 @@ float repulsionDisplacement(CurrentState current, float delta, float strength) {
 		float repulsion = imageLoad(SourceMeshSDF, comparedCoord).x * dot(current.normal, direction) * (1.0 - (d/delta));
 		totalRepulsion += -min(0.0, repulsion);
 	}
-	return (totalRepulsion / float(numSamples)) * strength * deltaTime;
+	return (totalRepulsion / float(numSamples)) * strength * simulationDeltaTime;
 }
 
 float gravityDisplacement(CurrentState current, float gravity) {
-	return max(0.0, -current.normal.y) * -gravity * deltaTime;
+	return max(0.0, -current.normal.y) * -gravity * simulationDeltaTime;
 }
 
 float vectorFieldDisplacement(CurrentState current, float strength) {
 	vec3 field = imageLoad(VectorField, current.coord).xyz;
-	return max(0.0, -dot(field, current.normal)) * -strength * deltaTime;
+	return max(0.0, -dot(field, current.normal)) * -strength * simulationDeltaTime;
 }
 
 float noiseExpansionDisplacement(CurrentState current, float strength) {
 	float expansion = smoothstep(.7, 1.0, imageLoad(VectorField, current.coord).a);
-	return -expansion * strength * deltaTime;
+	return -expansion * strength * simulationDeltaTime;
 }
 
 float expansionDisplacement(CurrentState current, float expansion) {
-	return -expansion * deltaTime;
+	return -expansion * simulationDeltaTime;
+}
+
+float planarExpansionDisplacement(CurrentState current, vec3 direction, float strength) {
+	
+	float curvature = 1.0 - smoothstep(.5, 1.0, clamp(curv2(current.coord, 5), 0.0, 1.0));
+
+	float cosTheta = smoothstep(0.0, 1.0, clamp(1.0 - abs(dot(current.normal, direction)), 0.0, 1.0));
+	return -cosTheta * strength * simulationDeltaTime;// * curvature;
 }
 
 float moltenCoreDisplacement(CurrentState current) {
 
 	float repulsion = repulsionDisplacement(current, 0.025, 550.0) * activation(current.sdf, 0.0, .1);
-	float curvature = curvatureDisplacement(current, 10.0) * activation(current.sdf, -.1, .2);
-	float expansion = expansionDisplacement(current, .01);
+	float curvature = curvatureDisplacement(current, 130.0) * activation(current.sdf, -.1, .2);
+	float expansion = expansionDisplacement(current, 1.1);
 	float curl = vectorFieldDisplacement(current, .0065);
 	float noise = noiseExpansionDisplacement(current, .15);
-	float gravity = gravityDisplacement(current, 10.0) * activation(current.sdf, -.1, .6);
+	float gravity = gravityDisplacement(current, 25.0) * activation(current.sdf, -.1, .2);
 	//return repulsion + curvature + expansion - gravityDisplacement(current, 1.0) * activation(current.sdf, 0.0, .1);
-
-	return repulsion + curvature;// gravity + repulsion; 
+	
+	//float c = curv2(current.coord, 20);
+	float planarIntensity = 2.0 * imageLoad(VectorField, current.coord).a;
+	float planar = planarExpansionDisplacement(current, vec3(0.0, 1.0, 0.0), planarIntensity);//  * activation(current.sdf, -.1, .1);
+	return planar + curvature;// + repulsion + curvature;// gravity + repulsion; 
 }
 
 /**************************************************************
@@ -288,7 +301,7 @@ void CreateKernelInput(ivec3 coord, ivec3 x, out KernelInput kInput) {
 	kInput.neighborCoord = x;
 
 #ifdef KERNEL_NORMAL
-	kInput.neighborNormal = sdfNormal(x, 2);
+	kInput.neighborNormal = sdfNormal(x, 1);
 #endif
 
 	kInput.normalizedOffset = vec3(x - coord) / float(KERNEL_HALF_SIZE);
@@ -341,7 +354,7 @@ void main() {
 
 	CurrentState current;
 	current.coord = coord;
-	current.normal = sdfNormal(coord, 1);
+	current.normal = sdfNormal(coord, 3);
 #ifdef SHARED_MEMORY
 	current.sdf = sharedSDF(coord, coord);
 #else
@@ -367,5 +380,5 @@ void main() {
 	
 	delta += MAIN_DISPLACEMENT_FUNCTION(current);
 
-	//imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
+	imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
 }
