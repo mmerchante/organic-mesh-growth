@@ -583,7 +583,7 @@ void main() {
 	//sdf -= perlin3D(nPos * 8.0) * .02;
 	//nPos += perlin3D(nPos * 4.0) * .1;
 
-	float sdf = generateMeshSDF(nPos);
+	float sdf = randomSpheres(nPos);
 
 	imageStore(VectorField, coord, vec4(curl3D(nPos * 3.0 + vec3(.123, .64, 5.0), .01), perlin3D(nPos * 5.0)));
 
