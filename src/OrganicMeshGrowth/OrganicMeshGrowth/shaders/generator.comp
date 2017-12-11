@@ -668,8 +668,9 @@ void main()
 	//nPos += perlin3D(nPos * 4.0) * .1;
 
 	float worley = 1.0 - smoothstep(0.075, .5, worley3D(nPos * 8.0 + vec3(10.0)));
+	float perlin = perlin3D(nPos * 5.0);
 
-	float sdf = generateMeshSDF(nPos, coord);
+	float sdf = length(nPos) - 0.35;//generateMeshSDF(nPos, coord);
 
 	imageStore(VectorField, coord, vec4(curl3D(nPos * 3.0 + vec3(.123, .64, 5.0), .01), worley));
 	imageStore(MeshSDF, coord, vec4(sdf));
