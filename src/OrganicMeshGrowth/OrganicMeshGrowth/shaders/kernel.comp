@@ -7,18 +7,32 @@
 
 //#define SHARED_MEMORY
 
-#define MOLTEN_CORE
+//#define MOLTEN_CORE
+#define DEMON_BUNNY
+//#define CORAL
 
 #ifdef SHARED_MEMORY
 	#define SHARED_MEMORY_NORMALS
 #endif
 
-#ifdef MOLTEN_CORE
+#if defined(MOLTEN_CORE)
+	// Stanford dragon or bunny
+	// Perlin noise
 	#define MAIN_DISPLACEMENT_FUNCTION moltenCoreDisplacement
 	#define KERNEL_DISPLACEMENT_FUNCTION moltenCoreKernel
 	#define KERNEL_HALF_SIZE 1
-#elif BISMUTH
-
+#elif defined(DEMON_BUNNY)
+	// Stanford bunny
+	// Perlin noise
+	#define MAIN_DISPLACEMENT_FUNCTION demonBunnyDisplacement
+	#define KERNEL_DISPLACEMENT_FUNCTION demonBunnyKernel
+	#define KERNEL_HALF_SIZE 1
+#elif defined(CORAL)
+	// Sphere
+	// Worley noise
+	#define MAIN_DISPLACEMENT_FUNCTION coralDisplacement
+	#define KERNEL_DISPLACEMENT_FUNCTION coralKernel
+	#define KERNEL_HALF_SIZE 1
 #endif
 
 #ifdef SHARED_MEMORY
@@ -92,9 +106,9 @@ vec3 sdfNormal(ivec3 pos, int offset) {
 	float dy = sharedSDF(pos + eps.yxy, pos) - sharedSDF(pos - eps.yxy, pos);
 	float dz = sharedSDF(pos + eps.yyx, pos) - sharedSDF(pos - eps.yyx, pos);
 #else
-	float dx = sdf(pos + eps.xyy) - sdf(pos - eps.xyy);
-	float dy = sdf(pos + eps.yxy) - sdf(pos - eps.yxy);
-	float dz = sdf(pos + eps.yyx) - sdf(pos - eps.yyx);
+	float dx = sdf(clamp(pos + eps.xyy, 0, SDF_TEXTURE_SIZE-1)) - sdf(clamp(pos - eps.xyy, 0, SDF_TEXTURE_SIZE-1));
+	float dy = sdf(clamp(pos + eps.yxy, 0, SDF_TEXTURE_SIZE-1)) - sdf(clamp(pos - eps.yxy, 0, SDF_TEXTURE_SIZE-1));
+	float dz = sdf(clamp(pos + eps.yyx, 0, SDF_TEXTURE_SIZE-1)) - sdf(clamp(pos - eps.yyx, 0, SDF_TEXTURE_SIZE-1));
 #endif
 
 	return normalize(vec3(dx, dy, dz));
@@ -268,18 +282,29 @@ float relaxation(CurrentState current, KernelInput kInput, float strength) {
 	return (kInput.neighborSDF - current.sdf) * strength;
 }
 
+/**************************************************************
+* KERNEL BEHAVIORS
+*************************************************************/
+
 float moltenCoreKernel(CurrentState current, KernelInput kInput) {
-	//float perlin = imageLoad(VectorField, current.coord).a;
-	return relaxation(current, kInput, 1.5) * simulationDeltaTime;
+	return relaxation(current, kInput, 100.0) * simulationDeltaTime;
+}
+
+float demonBunnyKernel(CurrentState current, KernelInput kInput) {
+	return relaxation(current, kInput, 50.0) * simulationDeltaTime;
+}
+
+float coralKernel(CurrentState current, KernelInput kInput) {
+	return relaxation(current, kInput, 50.0) * simulationDeltaTime;
 }
 
 /**************************************************************
 * VECTOR FIELD DISPLACEMENT
 *************************************************************/
 
-float curvatureDisplacement(CurrentState current, float strength) {
+float curvatureDisplacement(CurrentState current, float strength, int offset) {
 	//vec3 c = sdfCurvature(current.coord, 15);
-	float c = curv2(current.coord, 25);
+	float c = curv2(current.coord, offset);
 	//float d = max(0.0, -dot(c, current.normal)) * -strength * simulationDeltaTime;
 	return max(0.0, c) * -strength * simulationDeltaTime;
 }
@@ -325,10 +350,13 @@ float planarExpansionDisplacement(CurrentState current, vec3 direction, float st
 	return -cosTheta * strength * simulationDeltaTime;// * curvature;
 }
 
-float moltenCoreDisplacement(CurrentState current) {
+/**************************************************************
+* VECTOR FIELD BEHAVIORS
+*************************************************************/
 
+float palette(CurrentState current) {
 	float repulsion = repulsionDisplacement(current, 0.025, 550.0) * activation(current.sdf, 0.0, .1);
-	float curvature = curvatureDisplacement(current, 130.0) * activation(current.sdf, -.1, .2);
+	float curvature = curvatureDisplacement(current, 130.0, 25) * activation(current.sdf, -.1, .2);
 	float expansion = expansionDisplacement(current, 1.1);
 	float curl = vectorFieldDisplacement(current, .0065);
 	float noise = noiseExpansionDisplacement(current, 50.15) * step(current.sdf, 0.0);// activation(current.sdf, -.1, -.005);
@@ -340,6 +368,28 @@ float moltenCoreDisplacement(CurrentState current) {
 	
 	float planar = planarExpansionDisplacement(current, vec3(0.0, 1.0, 0.25), planarIntensity);//  * activation(current.sdf, -.1, .1);
 	return planar;// + repulsion + curvature;// gravity + repulsion; 
+}
+
+float moltenCoreDisplacement(CurrentState current) {
+	float repulsion = repulsionDisplacement(current, 0.025, 1000.1) * activation(current.sdf, 0.0, .1);
+	float gravity = gravityDisplacement(current, 15.0) * activation(current.sdf, -0.2, .5);
+	float noise = noiseExpansionDisplacement(current, 50.15) * step(current.sdf, 0.0);
+	return gravity + noise + repulsion;
+}
+
+float demonBunnyDisplacement(CurrentState current) {
+	float curvature = curvatureDisplacement(current, 130.0, 10) * activation(current.sdf, -.1, .2);
+	float repulsion = repulsionDisplacement(current, 0.025, 1000.1) * activation(current.sdf, 0.0, .1);
+	float noise = noiseExpansionDisplacement(current, 50.15) * step(current.sdf, 0.0);
+	return curvature + repulsion + noise;
+}
+
+float coralDisplacement(CurrentState current) {
+	float curvature = curvatureDisplacement(current, 100.0, 4) * activation(current.sdf, -.1, .1);
+	float repulsion = repulsionDisplacement(current, 0.025, 1000.1) * activation(current.sdf, 0.0, .1);
+	float noiseFactor = 1.0 - smoothstep(0.0, 4.0, totalTime);
+	float noise = noiseExpansionDisplacement(current, 50.15) * step(current.sdf, 0.0) * noiseFactor;
+	return repulsion + curvature + noise;
 }
 
 void main() {

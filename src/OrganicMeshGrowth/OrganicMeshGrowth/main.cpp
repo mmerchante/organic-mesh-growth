@@ -183,7 +183,7 @@ int main() {
     scene->AddModel(cube);
 	scene->CreateSceneSDF();
 	scene->CreateVectorField();
-	scene->LoadMesh("meshes/planar_expansion.obj", .3f);
+	scene->LoadMesh("meshes/bunny.obj", .3f);
 
     renderer = new Renderer(device, swapChain, scene, camera);
 	renderer->GenerateSceneSDF();
