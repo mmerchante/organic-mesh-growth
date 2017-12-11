@@ -8,8 +8,8 @@
 //#define SHARED_MEMORY
 
 //#define MOLTEN_CORE
-#define DEMON_BUNNY
-//#define CORAL
+//#define DEMON_BUNNY
+#define CORAL
 
 #ifdef SHARED_MEMORY
 	#define SHARED_MEMORY_NORMALS
