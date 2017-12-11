@@ -468,23 +468,20 @@ float udTriangleSquared(int triangleIndex, vec3 p, float currentDistance)
 	vec3 p1 = p - t.v1;
     vec3 p2 = p - t.v2;
     vec3 p3 = p - t.v3;
-	float radius = max(length(p1), max(length(p2), length(p3)));
+	//float radius = max(length(p1), max(length(p2), length(p3)));
 
-	return length(p - center) - .01;
+	//return length(p - center) - .01;
 
-	//if(currentDistance > length(p1) || currentDistance > length(p2) || currentDistance > length(p3))
-	//	return currentDistance * 2.0;
+	float insideFace = sign(dot(t.t21, p1)) + sign(dot(t.t32, p2)) + sign(dot(t.t13, p3));
+	float faceDistance = pow(dot(t.normal.xyz, p1), 2.0) * t.normal.w;
 
-	//float insideFace = sign(dot(t.t21, p1)) + sign(dot(t.t32, p2)) + sign(dot(t.t13, p3));
-	//float faceDistance = pow(dot(t.normal.xyz, p1), 2.0) * t.normal.w;
+	float edgeDistance = min(min(
+                  dot2(t.v21.xyz * saturate(dot(t.v21.xyz, p1) * t.v21.w) - p1), 
+                  dot2(t.v32.xyz * saturate(dot(t.v32.xyz, p2) * t.v32.w) - p2)), 
+                  dot2(t.v13.xyz * saturate(dot(t.v13.xyz, p3) * t.v13.w) - p3));
 
-	//float edgeDistance = min(min(
- //                 dot2(t.v21.xyz * saturate(dot(t.v21.xyz, p1) * t.v21.w) - p1), 
- //                 dot2(t.v32.xyz * saturate(dot(t.v32.xyz, p2) * t.v32.w) - p2)), 
- //                 dot2(t.v13.xyz * saturate(dot(t.v13.xyz, p3) * t.v13.w) - p3));
-
- //   //return (insideFace < 2.0) ? edgeDistance : signed * faceDistance;
-	//return signed *(sqrt(mix(faceDistance, edgeDistance, step(insideFace, 2.0)))/* - .01*/);
+    //return (insideFace < 2.0) ? edgeDistance : signed * faceDistance;
+	return signed *(sqrt(mix(faceDistance, edgeDistance, step(insideFace, 2.0)))/* - .01*/);
 }
 
 struct StackData

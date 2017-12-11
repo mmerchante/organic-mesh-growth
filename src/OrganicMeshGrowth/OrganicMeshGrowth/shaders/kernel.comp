@@ -357,8 +357,7 @@ void main() {
 	CurrentState current;
 	current.coord = coord;
 	current.normal = sdfNormal(coord, 3);
-#ifdef SHARED_MEMORY+
-
+#ifdef SHARED_MEMORY
 	current.sdf = sharedSDF(coord, coord);
 #else
 	current.sdf = sdf(coord);
