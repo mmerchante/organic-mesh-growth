@@ -54,7 +54,7 @@ const vec3 CLEAR_COLOR = vec3(.1, .09, .1);
 
 vec3 sdf_viz(vec3 rO, vec3 rD)
 {
-	rO.y += .5;
+	rO.y += .4999;
     float t = -rO.y / rD.y;
         
     if(t < 0.0)

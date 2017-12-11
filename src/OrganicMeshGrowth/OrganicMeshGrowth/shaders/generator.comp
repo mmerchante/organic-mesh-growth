@@ -281,6 +281,13 @@ vec2 hash2( vec2 p )
     return fract( 13.0 * k * fract(p.x*p.y*(p.x+p.y)));
 }
 
+vec3 hash3( vec3 p ) 
+{
+    const vec3 k = vec3( 0.3183099, 0.23678794, .9456743512 );
+    p = p * k + k.yxz;
+    return fract( 13.0 * k * fract(p.x*p.y*p.z*(p.x+p.y+p.z)));
+}
+
 // iq
 mat3x3 rotationAxisAngle( const vec3 v, float a )
 {
@@ -593,8 +600,37 @@ float generateMeshSDF(vec3 p, ivec3 coord)
 	return currentDistance - .0115;
 }
 
-void main() {
-	
+//vec3 random3D(vec3 x)
+//{
+//	float h = hash3D(x);
+//	float r1 = lcg(lcg(h));
+//	float r2 = lcg(lcg(r1));
+//	return vec3(h, r1, r2);
+//}
+
+float worley3D(vec3 p)
+{
+	ivec3 pos = ivec3(p);
+	ivec3 minRange = pos - ivec3(1);
+	ivec3 maxRange = pos + ivec3(1);
+
+	float minDistance = 100000.0;
+
+	for (int k = minRange.z; k <= maxRange.z; ++k) {
+		for (int j = minRange.y; j <= maxRange.y; ++j) {
+			for (int i = minRange.x; i <= maxRange.x; ++i) {
+				ivec3 neighbor = ivec3(i,j,k);
+				vec3 centerPosition = neighbor + hash3(neighbor);
+				minDistance = min(minDistance, length(centerPosition - p));
+			}
+		}
+	}
+
+	return (minDistance);
+}
+
+void main() 
+{
     ivec3 coord = ivec3(gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID);
     vec3 nPos = (vec3(coord) / vec3(gl_WorkGroupSize * gl_NumWorkGroups)) * 2.0 - 1.0;
 
@@ -605,9 +641,8 @@ void main() {
 	//sdf -= perlin3D(nPos * 8.0) * .02;
 	//nPos += perlin3D(nPos * 4.0) * .1;
 
-	float sdf = generateMeshSDF(nPos, coord);
+	float sdf = worley3D(nPos * 3.0 + vec3(10.0)) - .1;// generateMeshSDF(nPos, coord);
 
 	imageStore(VectorField, coord, vec4(curl3D(nPos * 3.0 + vec3(.123, .64, 5.0), .01), perlin3D(nPos * 5.0)));
-
 	imageStore(MeshSDF, coord, vec4(sdf));
 }

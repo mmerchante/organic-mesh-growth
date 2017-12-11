@@ -22,7 +22,8 @@ private:
 
     void* mappedData;
 
-    float r, theta, phi;
+    float fov, theta, phi;
+	float aspectRatio;
 
 public:
     Camera(Device* device, float aspectRatio);

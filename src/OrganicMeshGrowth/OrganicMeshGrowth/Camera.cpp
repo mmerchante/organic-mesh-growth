@@ -9,11 +9,13 @@
 #include "BufferUtils.h"
 
 Camera::Camera(Device* device, float aspectRatio) : device(device) {
-    r = 2.0f;
+	this->aspectRatio = aspectRatio;
+    fov = 25.0f;
     theta = 0.0f;
     phi = 0.0f;
+
     cameraBufferObject.viewMatrix = glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    cameraBufferObject.projectionMatrix = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
+    cameraBufferObject.projectionMatrix = glm::perspective(glm::radians(fov), aspectRatio, 0.1f, 100.0f);
     cameraBufferObject.projectionMatrix[1][1] *= -1; // y-coordinate is flipped
 	cameraBufferObject.invViewProjMatrix = glm::inverse(cameraBufferObject.projectionMatrix * cameraBufferObject.viewMatrix);
 	cameraBufferObject.cameraPosition = glm::inverse(cameraBufferObject.viewMatrix) * glm::vec4(0.f, 0.f, 0.f, 1.f);
@@ -30,15 +32,17 @@ VkBuffer Camera::GetBuffer() const {
 void Camera::UpdateOrbit(float deltaX, float deltaY, float deltaZ) {
     theta += deltaX;
     phi += deltaY;
-    r = glm::clamp(r - deltaZ, 1.0f, 10.0f);
+	fov = glm::clamp(fov - deltaZ * 1.5f, 5.0f, 45.0f);
 
     float radTheta = glm::radians(theta);
     float radPhi = glm::radians(phi);
 
     glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), radTheta, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), radPhi, glm::vec3(1.0f, 0.0f, 0.0f));
-    glm::mat4 finalTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * rotation * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, r));
+    glm::mat4 finalTransform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f)) * rotation * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.f));
 
     cameraBufferObject.viewMatrix = glm::inverse(finalTransform);
+	cameraBufferObject.projectionMatrix = glm::perspective(glm::radians(fov), aspectRatio, 0.1f, 100.0f);
+	cameraBufferObject.projectionMatrix[1][1] *= -1; // y-coordinate is flipped
 	cameraBufferObject.invViewProjMatrix = glm::inverse(cameraBufferObject.projectionMatrix * cameraBufferObject.viewMatrix);
 	cameraBufferObject.cameraPosition = glm::inverse(cameraBufferObject.viewMatrix) * glm::vec4(0.f, 0.f, 0.f, 1.f);
     
