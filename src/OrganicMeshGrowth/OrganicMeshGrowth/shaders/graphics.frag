@@ -1,6 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
+#define DEBUG_SDF
 #define MAX_DISTANCE 1.7320508
 #define EPSILON 0.002
 
@@ -14,6 +15,12 @@ layout(set = 0, binding = 0) uniform CameraBufferObject {
 layout(set = 1, binding = 1) uniform sampler2D texSampler;
 layout(set = 1, binding = 2) uniform sampler3D sdfSampler;
 layout(set = 1, binding = 3) uniform sampler3D vectorFieldSampler;
+
+layout(set = 1, binding = 4) uniform TimeBufferObject {
+    float deltaTime;
+    float totalTime;
+	float simulationDeltaTime;
+} time;
 
 layout(location = 0) in vec3 rayOrigin;
 
@@ -54,7 +61,13 @@ const vec3 CLEAR_COLOR = vec3(.1, .09, .1);
 
 vec3 sdf_viz(vec3 rO, vec3 rD)
 {
-	rO.y += .4999;
+#ifdef DEBUG_SDF
+	float offset = sin(time.totalTime * .1) * .5 + .5;
+#else
+	float offset = 0.0;
+#endif
+
+	rO.y += .5 - offset;
     float t = -rO.y / rD.y;
         
     if(t < 0.0)
@@ -65,7 +78,7 @@ vec3 sdf_viz(vec3 rO, vec3 rD)
 	if(abs(p.x) > .5 || abs(p.z) > .5)
 		return CLEAR_COLOR;
 
-	p.y += .5;
+	p.y = offset - .5;
     float d = sdf(p) * 12.0;
     return mix(CLEAR_COLOR, CLEAR_COLOR * 8.0, (smoothstep(.1, .2, mod(d, 1.0)) * .5));
 }
@@ -123,7 +136,7 @@ void main()
 		}
 
 		// A bit expensive but eh
-		if(vmax(abs(pos)) > .5 + EPSILON)
+		if(vmax(abs(pos)) > .501 + EPSILON)
 			break;
 	}
 
