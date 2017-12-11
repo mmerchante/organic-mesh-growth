@@ -117,6 +117,6 @@ A typical optimization for convolution kernels in compute shaders is to use shar
 
 ![](img/figure2.png)
 
-As can be seen, with a kernel width of 1, shared memory doesn't give us any benefit, likely because of the overhead introduced by the barrier. However, once we increase the kernel half-size, the simulation speed with shared memory doesn't slow down as fast as with global memory. In our observations this made a kernel half-size of 2 and 3 viable since it maintains interactive rates as compare to global memory. Any kernel half-size past this is too slow for use, even with shared memory.
+As can be seen, with a kernel width of 1, shared memory doesn't give us any benefit, likely because of the overhead introduced by the barrier. However, once we increase the kernel half-size, the simulation speed with shared memory doesn't slow down as fast as with global memory. In our observations, though, this doesn't increase the speed of our kernels enough to increase our kernel half-width. There might be room for improvement by utilizing parts of the shared memory access in the vector field displacements as well.
 
 **SDF Generation**
