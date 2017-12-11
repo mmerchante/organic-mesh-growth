@@ -12,7 +12,7 @@ In this project, we explore a GPU-based approach for mesh deformation through th
 
 ## Pipeline Overview
 
-[INSERT PIPELINE IMAGE HERE]
+![](img/pipeline.png)
 
 We use the Vulkan graphics and compute API in order to achieve our results. The overall setup of our project involves three phases:
   * SDF generation
