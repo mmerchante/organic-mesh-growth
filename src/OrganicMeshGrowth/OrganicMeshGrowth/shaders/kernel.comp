@@ -9,7 +9,8 @@
 
 //#define MOLTEN_CORE
 //#define DEMON_BUNNY
-#define CORAL
+//#define CORAL
+#define MUSHROOM
 
 #ifdef SHARED_MEMORY
 	#define SHARED_MEMORY_NORMALS
@@ -32,6 +33,10 @@
 	// Worley noise
 	#define MAIN_DISPLACEMENT_FUNCTION coralDisplacement
 	#define KERNEL_DISPLACEMENT_FUNCTION coralKernel
+	#define KERNEL_HALF_SIZE 1
+#elif defined(MUSHROOM)
+	#define MAIN_DISPLACEMENT_FUNCTION mushroomDisplacement
+	#define KERNEL_DISPLACEMENT_FUNCTION mushroomKernel
 	#define KERNEL_HALF_SIZE 1
 #endif
 
@@ -298,6 +303,10 @@ float coralKernel(CurrentState current, KernelInput kInput) {
 	return relaxation(current, kInput, 50.0) * simulationDeltaTime;
 }
 
+float mushroomKernel(CurrentState current, KernelInput kInput) {
+	return relaxation(current, kInput, 15.0) * simulationDeltaTime;
+}
+
 /**************************************************************
 * VECTOR FIELD DISPLACEMENT
 *************************************************************/
@@ -390,6 +399,30 @@ float coralDisplacement(CurrentState current) {
 	float noiseFactor = 1.0 - smoothstep(0.0, 4.0, totalTime);
 	float noise = noiseExpansionDisplacement(current, 50.15) * step(current.sdf, 0.0) * noiseFactor;
 	return repulsion + curvature + noise;
+}
+
+float mushroomDisplacement(CurrentState current) { 	
+
+	float c = curv2(current.coord, 5);
+	float gravity = gravityDisplacement(current, c * 100.0) * activation(current.sdf, -0.1, .1);
+
+	float repulsion = repulsionDisplacement(current, 0.1, 1000.1) * activation(current.sdf, 0.0, .1);
+	float timeFactor = (1.0 - smoothstep(2.0, 3.0, totalTime));
+	float curvature = curvatureDisplacement(current, 200.0, 10) * activation(current.sdf, -.1, .2);
+
+	// Random planar direction
+	vec3 field = imageLoad(VectorField, current.coord).xyz;
+	field.xz *= .2;
+	field = normalize(field);
+
+	float planarIntensity = mix(imageLoad(VectorField, current.coord).a, .5, timeFactor);
+	float planar = planarExpansionDisplacement(current, field, planarIntensity * 50.0) * activation(current.sdf, -.1, .1);
+	float curl = vectorFieldDisplacement(current, .1);
+	//planar = planar * (1.0 - smoothstep(8.0, 12.0, totalTime));
+	
+	float simplePlanar = planarExpansionDisplacement(current, vec3(0.0, 1.0, 0.0), planarIntensity * 6.0) * activation(current.sdf, -.1, .05);
+
+	return gravity + repulsion + simplePlanar; // + curvature + curl;
 }
 
 void main() {

@@ -183,7 +183,7 @@ int main() {
     scene->AddModel(cube);
 	scene->CreateSceneSDF();
 	scene->CreateVectorField();
-	scene->LoadMesh("meshes/bust.obj", .95f);
+	scene->LoadMesh("meshes/mushroom_base.obj", .4f);
 
     renderer = new Renderer(device, swapChain, scene, camera);
 	renderer->GenerateSceneSDF();

@@ -4,9 +4,9 @@
 //#define VISUALIZE_SDF
 #define DEBUG_SDF
 #define MAX_DISTANCE 1.7320508
-#define EPSILON 0.005
+#define EPSILON 0.0035
 
-#define MAX_ITERATIONS 250
+#define MAX_ITERATIONS 350
 
 #define saturate(x) clamp(x, 0.0, 1.0)
 
@@ -125,18 +125,20 @@ void main()
 		vec3 pos = rayOrigin + rayDirection * t;
 		dist = sdf(pos);
 
-		t += dist * .1;//clamp(dist * .02, 0.0, .001);
-
 		if(dist < EPSILON)
 		{
 			hit = true;
 			break;
 		}
 
+		t += dist * .035;//clamp(dist * .02, 0.0, .001);
+
 		// A bit expensive but eh
 		if(vmax(abs(pos)) > .501 + EPSILON)
 			break;
 	}
+
+	t -= EPSILON;
 
 	if(hit)
 	{
@@ -146,7 +148,7 @@ void main()
 		vec3 lightDirection = normalize(lightPosition - pos);
 		float lightIntensity = 2.0;
 
-		float c = smoothstep(0.0, 1.0, 1.0 - saturate(curvature(pos, .04)));
+		float c = smoothstep(0.0, 1.0, 1.0 - saturate(curvature(pos, .05)));
 
 		float diffuse = sdf(pos - rayDirection * .05) / .4;
 		float sss = saturate((sdf(pos + normal * .01 + lightDirection * .05) ) / .175);
@@ -164,7 +166,7 @@ void main()
 		vec3 specularColor = vec3(.4, .7, .9);
 		vec3 ambient = envColor * envColor * .05 + coreColor * .1;
 
-		resultColor = mix(baseColor, coreColor * coreColor, saturate(c + 1.0 - sss)) * (sss + diffuse) * .5 * lightIntensity;
+		resultColor = mix(baseColor, coreColor * coreColor, saturate(c + 1.0 - sss)) * (sss + diffuse * .2) * .5 * lightIntensity;
 		resultColor += specularColor * (specular * .3) + envColor * facingRatio * .45;
 		resultColor += ambient;
 	}
