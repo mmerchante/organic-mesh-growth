@@ -252,8 +252,8 @@ void Scene::CreateVectorField()
 	samplerInfo.mipLodBias = 0.0f;
 	samplerInfo.minLod = 0.0f;
 	samplerInfo.maxLod = 0.0f;
-
-	this->vectorFieldTexture = new Texture3D(device, 256, 256, 256, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo);
+	//VK_FORMAT_R8G8B8A8_UNORM
+	this->vectorFieldTexture = new Texture3D(device, 256, 256, 256, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, samplerInfo);
 }
 
 Texture3D * Scene::GetVectorField()

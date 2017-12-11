@@ -207,6 +207,53 @@ vec3 cosineWeightedSample(vec3 normal, inout uint seed) {
 	return normalize(v * x + u * y + normal * z);
 }
 
+/**************************************************************
+* CORE 
+*************************************************************/
+
+void CreateKernelInput(ivec3 coord, ivec3 x, out KernelInput kInput) {
+	kInput.neighborCoord = x;
+
+#ifdef KERNEL_NORMAL
+	kInput.neighborNormal = sdfNormal(x, 1);
+#endif
+
+	kInput.normalizedOffset = vec3(x - coord) / float(KERNEL_HALF_SIZE);
+
+#ifdef SHARED_MEMORY
+	kInput.neighborSDF = sharedSDF(x, coord);
+#else
+	kInput.neighborSDF = sdf(x);
+#endif
+}
+
+#ifdef SHARED_MEMORY
+void populateSharedMemory(ivec3 coord) {
+	ivec3 modCoord = coord % ivec3(WORKGROUP_SIZE);
+	ivec3 sharedCoord = modCoord + ivec3(KERNEL_HALF_SIZE);
+	int flatIndex = sharedCoord.x + (SHARED_SIZE * sharedCoord.y) + (SHARED_SIZE * SHARED_SIZE * sharedCoord.z);
+
+	// Populate myself and my neighbors if border
+	//vec3 floatSign = step(modCoord, vec3(0)) * -1.0 + step(vec3(WORKGROUP_SIZE - 1), modCoord);
+	//ivec3 sign = ivec3(floatSign);
+	ivec3 sign = ivec3(equal(modCoord, ivec3(0))) * -1 + ivec3(equal(modCoord, ivec3(WORKGROUP_SIZE - 1)));
+	ivec3 range = KERNEL_HALF_SIZE * sign;
+	ivec3 minRange = min(range, 0);
+	ivec3 maxRange = max(range, 0);
+
+	for (int k = minRange.z; k <= maxRange.z; ++k) {
+		for (int j = minRange.y; j <= maxRange.y; ++j) {
+			for (int i = minRange.x; i <= maxRange.x; ++i) {
+				ivec3 neighborCoord = coord + ivec3(i, j, k);
+				ivec3 neighborSharedCoord = sharedCoord + ivec3(i, j, k);
+				int neighborFlatIndex = neighborSharedCoord.x + (SHARED_SIZE * neighborSharedCoord.y) + (SHARED_SIZE * SHARED_SIZE * neighborSharedCoord.z);
+				sharedData[neighborFlatIndex] = imageLoad(SourceMeshSDF, neighborCoord).x;
+			}
+		}
+	}
+}
+#endif
+
 
 /**************************************************************
 * KERNEL DISPLACEMENT
@@ -223,7 +270,7 @@ float relaxation(CurrentState current, KernelInput kInput, float strength) {
 
 float moltenCoreKernel(CurrentState current, KernelInput kInput) {
 	//float perlin = imageLoad(VectorField, current.coord).a;
-	return 0.0;// relaxation(current, kInput, 10.5) * simulationDeltaTime;
+	return relaxation(current, kInput, 1.5) * simulationDeltaTime;
 }
 
 /**************************************************************
@@ -284,61 +331,16 @@ float moltenCoreDisplacement(CurrentState current) {
 	float curvature = curvatureDisplacement(current, 130.0) * activation(current.sdf, -.1, .2);
 	float expansion = expansionDisplacement(current, 1.1);
 	float curl = vectorFieldDisplacement(current, .0065);
-	float noise = noiseExpansionDisplacement(current, .15);
+	float noise = noiseExpansionDisplacement(current, 50.15) * step(current.sdf, 0.0);// activation(current.sdf, -.1, -.005);
 	float gravity = gravityDisplacement(current, 25.0) * activation(current.sdf, -.1, .2);
 	//return repulsion + curvature + expansion - gravityDisplacement(current, 1.0) * activation(current.sdf, 0.0, .1);
 	
 	//float c = curv2(current.coord, 20);
-	float planarIntensity = 2.0 * imageLoad(VectorField, current.coord).a;
-	float planar = planarExpansionDisplacement(current, vec3(0.0, 1.0, 0.0), planarIntensity);//  * activation(current.sdf, -.1, .1);
-	return planar + curvature;// + repulsion + curvature;// gravity + repulsion; 
+	float planarIntensity = 1.0 + imageLoad(VectorField, current.coord).a * .2;
+	
+	float planar = planarExpansionDisplacement(current, vec3(0.0, 1.0, 0.25), planarIntensity);//  * activation(current.sdf, -.1, .1);
+	return planar;// + repulsion + curvature;// gravity + repulsion; 
 }
-
-/**************************************************************
-* MAIN 
-*************************************************************/
-void CreateKernelInput(ivec3 coord, ivec3 x, out KernelInput kInput) {
-	kInput.neighborCoord = x;
-
-#ifdef KERNEL_NORMAL
-	kInput.neighborNormal = sdfNormal(x, 1);
-#endif
-
-	kInput.normalizedOffset = vec3(x - coord) / float(KERNEL_HALF_SIZE);
-
-#ifdef SHARED_MEMORY
-	kInput.neighborSDF = sharedSDF(x, coord);
-#else
-	kInput.neighborSDF = sdf(x);
-#endif
-}
-
-#ifdef SHARED_MEMORY
-void populateSharedMemory(ivec3 coord) {
-	ivec3 modCoord = coord % ivec3(WORKGROUP_SIZE);
-	ivec3 sharedCoord = modCoord + ivec3(KERNEL_HALF_SIZE);
-	int flatIndex = sharedCoord.x + (SHARED_SIZE * sharedCoord.y) + (SHARED_SIZE * SHARED_SIZE * sharedCoord.z);
-
-	// Populate myself and my neighbors if border
-	//vec3 floatSign = step(modCoord, vec3(0)) * -1.0 + step(vec3(WORKGROUP_SIZE - 1), modCoord);
-	//ivec3 sign = ivec3(floatSign);
-	ivec3 sign = ivec3(equal(modCoord, ivec3(0))) * -1 + ivec3(equal(modCoord, ivec3(WORKGROUP_SIZE - 1)));
-	ivec3 range = KERNEL_HALF_SIZE * sign;
-	ivec3 minRange = min(range, 0);
-	ivec3 maxRange = max(range, 0);
-
-	for (int k = minRange.z; k <= maxRange.z; ++k) {
-		for (int j = minRange.y; j <= maxRange.y; ++j) {
-			for (int i = minRange.x; i <= maxRange.x; ++i) {
-				ivec3 neighborCoord = coord + ivec3(i, j, k);
-				ivec3 neighborSharedCoord = sharedCoord + ivec3(i, j, k);
-				int neighborFlatIndex = neighborSharedCoord.x + (SHARED_SIZE * neighborSharedCoord.y) + (SHARED_SIZE * SHARED_SIZE * neighborSharedCoord.z);
-				sharedData[neighborFlatIndex] = imageLoad(SourceMeshSDF, neighborCoord).x;
-			}
-		}
-	}
-}
-#endif
 
 void main() {
 	
@@ -355,7 +357,8 @@ void main() {
 	CurrentState current;
 	current.coord = coord;
 	current.normal = sdfNormal(coord, 3);
-#ifdef SHARED_MEMORY
+#ifdef SHARED_MEMORY+
+
 	current.sdf = sharedSDF(coord, coord);
 #else
 	current.sdf = sdf(coord);
@@ -380,5 +383,5 @@ void main() {
 	
 	delta += MAIN_DISPLACEMENT_FUNCTION(current);
 
-	//imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
+	imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
 }
