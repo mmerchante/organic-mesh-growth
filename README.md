@@ -61,7 +61,7 @@ Gravity can be thought of as an expansion along a specified direction. Given thi
 
 *Planar Expansion*
 
-[ INSERT GIF ]
+![](img/planar.png)
 
 This expansion is similar to gravity. It takes in a specified direction, but instead of growing in that direction, we grow in the plane that is perpindicular to it. This allows for radial growth patterns based on similar dot product analysis as in gravity.
 
