@@ -10,8 +10,9 @@
 struct TriangleData {
 	vec3 v1, v2, v3;
 	vec4 v21, v32, v13;
-	vec4 normal;
+	vec3 normal;//, n1, n2, n3;
 	vec3 t21, t32, t13;
+	vec4 center;
 };
 
 struct TreeNode
@@ -456,32 +457,50 @@ float randomSpheres(vec3 p)
 }
 
 // Reference: http://www.iquilezles.org/www/articles/triangledistance/triangledistance.htm
-float udTriangleSquared(int triangleIndex, vec3 p, float currentDistance) 
+// We added triangle orientation, with some hacks
+float udTriangleSquared(int triangleIndex, vec3 p) 
 {
 	TriangleData t = data[triangleIndex];
-
-	vec3 center = (t.v1 + t.v2 + t.v3) * .3333333;
-
-	float signed = -sign(dot(t.normal.xyz, p - t.v1));
-	float signAlt = -sign(dot(t.normal.xyz, p - center));
 
 	vec3 p1 = p - t.v1;
     vec3 p2 = p - t.v2;
     vec3 p3 = p - t.v3;
-	//float radius = max(length(p1), max(length(p2), length(p3)));
 
-	//return length(p - center) - .01;
+	// Projections on boundaries
+	float t1 = dot(t.t21, p1);
+	float t2 = dot(t.t32, p2);
+	float t3 = dot(t.t13, p3);
+	float a = -.005;
+	float b = 0.0;
+	float outsideFace = smoothstep(a,b, t1) + smoothstep(a,b, t2) + smoothstep(a,b, t3);//sign(t1) + sign(t2) + sign(t3);
 
-	float insideFace = sign(dot(t.t21, p1)) + sign(dot(t.t32, p2)) + sign(dot(t.t13, p3));
-	float faceDistance = pow(dot(t.normal.xyz, p1), 2.0) * t.normal.w;
+	if(outsideFace > 2.995)
+	{
+		float s = -sign(dot(t.normal.xyz, p1));
+		return abs(dot(t.normal.xyz, p1)) * s;
+	}
+	else
+	{
+		float d1 = dot2(t.v21.xyz * saturate(dot(t.v21.xyz, p1) * t.v21.w) - p1);
+		float d2 = dot2(t.v32.xyz * saturate(dot(t.v32.xyz, p2) * t.v32.w) - p2);
+		float d3 = dot2(t.v13.xyz * saturate(dot(t.v13.xyz, p3) * t.v13.w) - p3);
 
-	float edgeDistance = min(min(
-                  dot2(t.v21.xyz * saturate(dot(t.v21.xyz, p1) * t.v21.w) - p1), 
-                  dot2(t.v32.xyz * saturate(dot(t.v32.xyz, p2) * t.v32.w) - p2)), 
-                  dot2(t.v13.xyz * saturate(dot(t.v13.xyz, p3) * t.v13.w) - p3));
+		float edgeDistance = min(min(d1, d2), d3);
+		return sqrt(edgeDistance);
+	}
+}
 
-    //return (insideFace < 2.0) ? edgeDistance : signed * faceDistance;
-	return signed *(sqrt(mix(faceDistance, edgeDistance, step(insideFace, 2.0)))/* - .01*/);
+// Reference: http://www.iquilezles.org/www/articles/triangledistance/triangledistance.htm
+float udTriangleFast(int triangleIndex, vec3 p) 
+{
+	TriangleData t = data[triangleIndex];
+
+	float d = length(p - t.center.xyz);
+
+	if(d < t.center.w)
+		return udTriangleSquared(triangleIndex, p);
+
+	return d;
 }
 
 struct StackData
@@ -522,6 +541,8 @@ float generateMeshSDF(vec3 p, ivec3 coord)
 	float minDistance = -1.0;
 	float currentDistance = 10.0;
 
+	int closestTriangleIndex = -1;
+
 	// The stack approach is very similar to pbrtv3
 	while (currentNode != -1 && stackTop < 16 && iterations++ < 300)
 	{
@@ -540,7 +561,7 @@ float generateMeshSDF(vec3 p, ivec3 coord)
 			}
 			else 
 			{	
-				return currentDistance;
+				return udTriangleSquared(closestTriangleIndex, p);
 			}
 		}
 
@@ -561,11 +582,14 @@ float generateMeshSDF(vec3 p, ivec3 coord)
 				// Check intersection with all primitives inside this node
 				for (int i = 0; i < primitiveCount; i++)
 				{
-					float triangleDistance = udTriangleSquared(triangleOffset + i, p, currentDistance);
+					float triangleDistance = udTriangleFast(triangleOffset + i, p);
 					//currentDistance = min(abs(currentDistance), abs(triangleDistance));
 					
 					if(abs(triangleDistance) < abs(currentDistance))
+					{
 						currentDistance = triangleDistance;
+						closestTriangleIndex = triangleOffset + i;
+					}
 				}
 
 				if (stackTop > 0)
@@ -576,7 +600,7 @@ float generateMeshSDF(vec3 p, ivec3 coord)
 				}
 				else 
 				{
-					return currentDistance; // There's no other object in the stack, we finished iterating!
+					return udTriangleSquared(closestTriangleIndex, p); // There's no other object in the stack, we finished iterating!
 				}
 			}
 			else
@@ -596,6 +620,8 @@ float generateMeshSDF(vec3 p, ivec3 coord)
 			}
 		}
 	}
+
+	currentDistance = udTriangleSquared(closestTriangleIndex, p);
 	
 	return currentDistance - .0115;
 }

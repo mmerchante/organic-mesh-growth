@@ -11,8 +11,9 @@ using namespace std::chrono;
 struct TriangleData {
 	GLM_ALIGN(16) glm::vec3 v1, v2, v3;
 	GLM_ALIGN(16) glm::vec4 v21, v32, v13;
-	GLM_ALIGN(16) glm::vec4 normal;
+	GLM_ALIGN(16) glm::vec3 normal;// , n1, n2, n3;
 	GLM_ALIGN(16) glm::vec3 t21, t32, t13;
+	GLM_ALIGN(16) glm::vec4 center; // (center, radius)
 };
 
 struct Time {
@@ -60,10 +61,10 @@ struct Triangle
 	glm::vec3 p2;
 	glm::vec3 p3;
 
-	// Normals
-	glm::vec3 n1;
-	glm::vec3 n2;
-	glm::vec3 n3;
+	//// Normals
+	//glm::vec3 n1;
+	//glm::vec3 n2;
+	//glm::vec3 n3;
 
 	AABB bounds;
 };

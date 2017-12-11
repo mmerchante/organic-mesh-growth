@@ -162,6 +162,21 @@ void Scene::LoadMesh(const std::string filename, float scaleMultiplier)
 				fullTri->p2 = tri.v2;
 				fullTri->p3 = tri.v3;
 
+				//// n1
+				//fullTri->n1.x = attrib.normals[i1 * 3 + 0];
+				//fullTri->n1.y = attrib.normals[i1 * 3 + 1];
+				//fullTri->n1.z = attrib.normals[i1 * 3 + 2];
+
+				//// n2
+				//fullTri->n2.x = attrib.normals[i2 * 3 + 0];
+				//fullTri->n2.y = attrib.normals[i2 * 3 + 1];
+				//fullTri->n2.z = attrib.normals[i2 * 3 + 2];
+
+				//// n3
+				//fullTri->n3.x = attrib.normals[i3 * 3 + 0];
+				//fullTri->n3.y = attrib.normals[i3 * 3 + 1];
+				//fullTri->n3.z = attrib.normals[i3 * 3 + 2];
+
 				triangles.push_back(fullTri);
 			}
 			else
@@ -681,12 +696,30 @@ void Mesh::Compact()
 				tri.v13.w = 1.f / glm::dot(tri.v13, tri.v13);
 
 				// Unnormalized normal
-				tri.normal = glm::vec4(glm::cross(glm::vec3(tri.v21), glm::vec3(tri.v13)), 0.f);
-				tri.normal.w = 1.f / glm::dot(tri.normal, tri.normal);
+				tri.normal = glm::normalize(glm::cross(glm::vec3(tri.v21), glm::vec3(tri.v13)));
+/*
+				tri.n1 = tri.normal;
+				tri.n2 = tri.normal;
+				tri.n3 = tri.normal;*/
+/*
+				tri.n1 = glm::vec4(glm::normalize(triangle->n1), 0.0f);
+				tri.n2 = glm::vec4(glm::normalize(triangle->n2), 0.0f);
+				tri.n3 = glm::vec4(glm::normalize(triangle->n3), 0.0f);*/
+				//tri.smoothNormal = glm::vec4(glm::normalize(triangle->n1 + triangle->n2 + triangle->n3), 0.0);
 
 				tri.t21 = glm::cross(glm::vec3(tri.v21), glm::vec3(tri.normal));
 				tri.t32 = glm::cross(glm::vec3(tri.v32), glm::vec3(tri.normal));
 				tri.t13 = glm::cross(glm::vec3(tri.v13), glm::vec3(tri.normal));
+
+				// We bent the normals a bit! This hack is good to have *reasonable and fast* triangle orientation
+				tri.t21 = glm::normalize(tri.t21 + glm::vec3(tri.normal) * .03f);
+				tri.t32 = glm::normalize(tri.t32 + glm::vec3(tri.normal) * .03f);
+				tri.t13 = glm::normalize(tri.t13 + glm::vec3(tri.normal) * .03f);
+
+				glm::vec3 c = (tri.v1 + tri.v2 + tri.v3) / 3.f;
+				float radius = glm::max(glm::length(c - tri.v1), glm::max(glm::length(c - tri.v2), glm::length(c - tri.v3)));
+				
+				tri.center = glm::vec4(c.x, c.y, c.z, radius);
 			}
 
 			triangleOffset += triCount;
