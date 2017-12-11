@@ -6,7 +6,7 @@
 #define MAX_DISTANCE 1.7320508
 #define EPSILON 0.0035
 
-#define MAX_ITERATIONS 350
+#define MAX_ITERATIONS 1000
 
 #define saturate(x) clamp(x, 0.0, 1.0)
 

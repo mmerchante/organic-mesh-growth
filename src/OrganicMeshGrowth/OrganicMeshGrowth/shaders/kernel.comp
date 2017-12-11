@@ -422,7 +422,7 @@ float mushroomDisplacement(CurrentState current) {
 	
 	float simplePlanar = planarExpansionDisplacement(current, vec3(0.0, 1.0, 0.0), planarIntensity * 6.0) * activation(current.sdf, -.1, .05);
 
-	return gravity + repulsion + simplePlanar; // + curvature + curl;
+	return gravity + curl + repulsion + simplePlanar; // + curvature + curl;
 }
 
 void main() {
@@ -465,5 +465,7 @@ void main() {
 	
 	delta += MAIN_DISPLACEMENT_FUNCTION(current);
 
-	imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta));
+	float timeFactor = (1.0 - smoothstep(35.0, 40.0, totalTime)) * smoothstep(0.0, .2, totalTime);
+
+	imageStore(TargetMeshSDF, coord, vec4(current.sdf + delta * timeFactor));
 }
