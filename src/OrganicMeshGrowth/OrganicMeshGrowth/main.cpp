@@ -72,7 +72,7 @@ int main() {
 	system("compiler.bat");
 	
     static constexpr char* applicationName = "Organic Mesh Growth";
-    InitializeWindow(1280, 720, applicationName);
+    InitializeWindow(1600, 900, applicationName);
 
     unsigned int glfwExtensionCount = 0;
     const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -99,7 +99,7 @@ int main() {
 
     swapChain = device->CreateSwapChain(surface, 5);
 
-    camera = new Camera(device, 1280.f / 720.f);
+    camera = new Camera(device, 1600.f / 900.f);
 
     VkCommandPoolCreateInfo transferPoolInfo = {};
     transferPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -183,7 +183,7 @@ int main() {
     scene->AddModel(cube);
 	scene->CreateSceneSDF();
 	scene->CreateVectorField();
-	scene->LoadMesh("meshes/bunny.obj", .3f);
+	scene->LoadMesh("meshes/mushroom_base.obj", .4f);
 
     renderer = new Renderer(device, swapChain, scene, camera);
 	renderer->GenerateSceneSDF();
