@@ -12,6 +12,8 @@ Demo video: [YouTube](https://www.youtube.com/watch?v=5X8cMu2wlFM)
 
 In this project, we explore a GPU-based approach for mesh deformation through the use of **signed distance fields** (SDFs). A discrete SDF can be thought of as a three dimensional grid of data in which each cell corresponds to the distance to the nearest surface. This means that cells outside of the mesh are positive, cells on the surface are approximately zero, and cells within the mesh are negative. With this information, we proposed to implement the ability to deform the mesh at each timestep through the use of compute shaders in Vulkan. We then are able to raymarch the SDF to visualize the results of our simulation in real-time.
 
+Most approaches that implement these behaviours use remeshing (mesh->sdf->mesh cycle) to simplify displacement logic and stabilize the SDF; however, we proposed to keep all information and behaviours in SDF space and see if it stable enough.
+
 ## Pipeline Overview
 
 ![](img/pipeline.png)
