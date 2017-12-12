@@ -1,3 +1,7 @@
+
+[![](img/thumb_omg.png)](https://www.youtube.com/watch?v=5X8cMu2wlFM)
+Demo video: [YouTube](https://www.youtube.com/watch?v=5X8cMu2wlFM)
+
 # Organic Mesh Growth
 
 **University of Pennsylvania, CIS 565**
@@ -5,9 +9,6 @@
 *A Vulkan implementation by [Mohamad Moneimne](https://github.com/moneimne) and [Mariano Merchante](https://github.com/mmerchante)*
 
 ## Project Overview
-
-[![](img/thumb_omg.png)](https://www.youtube.com/watch?v=5X8cMu2wlFM)
-Demo video: [YouTube](https://www.youtube.com/watch?v=5X8cMu2wlFM)
 
 In this project, we explore a GPU-based approach for mesh deformation through the use of **signed distance fields** (SDFs). An SDF can be thought of as a three dimensional grid of data in which each cell corresponds to the distance to the nearest surface. This means that cells outside of the mesh are positive, cells on the surface are approximately zero, and cells within the mesh are negative. With this information, we proposed the ability to deform the mesh at each timestep through the use of compute shaders in Vulkan. We then are able to raymarch the SDF to visualize the results of our simulation in real-time.
 
