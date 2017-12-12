@@ -10,7 +10,7 @@ Demo video: [YouTube](https://www.youtube.com/watch?v=5X8cMu2wlFM)
 
 ## Project Overview
 
-In this project, we explore a GPU-based approach for mesh deformation through the use of **signed distance fields** (SDFs). An SDF can be thought of as a three dimensional grid of data in which each cell corresponds to the distance to the nearest surface. This means that cells outside of the mesh are positive, cells on the surface are approximately zero, and cells within the mesh are negative. With this information, we proposed the ability to deform the mesh at each timestep through the use of compute shaders in Vulkan. We then are able to raymarch the SDF to visualize the results of our simulation in real-time.
+In this project, we explore a GPU-based approach for mesh deformation through the use of **signed distance fields** (SDFs). A discrete SDF can be thought of as a three dimensional grid of data in which each cell corresponds to the distance to the nearest surface. This means that cells outside of the mesh are positive, cells on the surface are approximately zero, and cells within the mesh are negative. With this information, we proposed to implement the ability to deform the mesh at each timestep through the use of compute shaders in Vulkan. We then are able to raymarch the SDF to visualize the results of our simulation in real-time.
 
 ## Pipeline Overview
 
@@ -21,14 +21,28 @@ We use the Vulkan graphics and compute API in order to achieve our results. The 
   * SDF deformation
   * SDF visualization
 
-**SDF generation** occurs once per instance of the application as a preprocess step. This is done using a compute shader in which each thread (or shader invocation) is responsible for populating a single cell in the SDF. Additional 3D textures can be created here which will be used during the deformation, such as Perlin and Worley noise.
+**SDF generation** occurs once per instance of the application as a preprocess step. This is done using a compute shader in which each thread (or shader invocation) is responsible for populating a single cell in the SDF. Additional 3D textures can be created here which will be used during the deformation, such as Perlin, Curl and Worley noise.
 
 **SDF deformation** occurs once per frame, propagating the simulation of our deformations. Similarly to SDF generation, this is done in a compute shader in which each thread is responsible for determining how the SDF should change at a given cell. This is accomplished by using combinations of convolution kernels and vector fields in order to determine the displacement of distances along the SDF.
 
 **SDF visualization** occurs once per frame, allowing us to see the geometry as the simulation progresses. This is done using a graphics pipeline in which we rasterize a cube that represents the bounds of our SDF. In the fragment shader, we then are able to raymarch through the cube and poll the SDF for distances to the surface. While doing this, we continue to march until we receive a distance of zero or less, indicating we have reached the mesh.
 
 ## SDF Generation
-- Turn of TDR
+To be able to see interesting behaviours, we need interesting shapes. Althought the sdf generator compute shader can procedurally generate some spheres or a purely mathematical described Minion, some of the complexity of actual meshes are lost.
+
+Triangle mesh conversion to SDF is not a trivial problem, and has many subtleties that had to be considered. There are three main problems:
+
+- Time complexity of finding the nearest distance to a mesh in a cube grid, for every cell.
+- Calculating the sdf of a triangle
+- Making sure that the sign of the distance field is correct, i.e., negative distance inside the mesh and positive outside it.
+
+We approached these problems with the following techniques:
+
+- We implemented a kd-tree that is used for nearest neighbor search in a stack based, GPU search. An interesting optimization that improves performance drastically is, while searching and comparing distances, assuming triangles are spheres unless the point is really close to it (<radius), and after the closest triangle is found, calculating the actual distance to it.
+- Precomputed all possible data necessary for each triangle SDF calculation. The memory cost is not trivial, but the performance improvement is necessary.
+- For finding the sign of a triangle there are many different approaches and approximations. Using the normal of the triangle for orientation is not enough; edge cases exist which make the naive approach unusable.A popular solution is using a weighted normal to find pseudonormals on the triangle edges. In the end, we bent the direction of the edges towards the normal, projecting some kind of trapezoid, which reduced the amount of edge cases drastically, while being practically free performance-wise (because it is done in CPU).
+
+Note that when running, it may be necessary to turn off TDR, given that the application may quit before the sdf is calculated.
 
 ## SDF Deformation
 A large part of this project was attempting to formalize the types of deformations that can occur on an SDF. Because of the 3D grid nature of SDFs, we decided to introduce two main types of deformations:
