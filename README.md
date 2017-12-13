@@ -61,31 +61,37 @@ These kinds of displacements are simply implemented as 3D convolution kernels. F
 
 In this kernel, we essentially just return the average of a cell and its neighbors within a certain kernel radius. For each cell, this colloquially means something along the lines of, "I want to be more like my neighbors". This means that areas of high frequency will begin to smooth out as cells corresponding to concave areas will begin to fill out and cells corresponding to convex areas will begin to retract. This ends up looking like a "smoothing" effect, which is why we dubbed it "relaxation". This deformation turns out to be an integral part of all our compound deformations since it reduces potential artifacts from saturation of cells in our SDF.
 
+Notice that, in the case of an invalid mesh SDF, holes in the mesh "eat" it away.
+
+![](img/rel_alt.gif)
+
 **Vector Field Displacements**
 
 These kinds of displacements refer to any other type of deformations in which we poll some function in order to determine how each cell should displace. So far, these include expansion, gravity, planar expansion, noise expansion, curl expansion, repulsion, and curvature expansion.
 
 *Expansion*
 
-![](img/expansion.gif)
+![](img/exp.gif)
 
 Expansion is the simplest vector field to think of. Essentially, we are just continuously expanding the entire SDF by some constant, which can be positive or negative. A negative expansion will cause or mesh to puff up, since we are reducing the distances to the mesh along our SDF, while a positive expansion will cause our mesh to uniformly decay.
 
 *Gravity*
 
-![](img/gravity.gif)
+![](img/grav.gif)
 
 Gravity can be thought of as an expansion along a specified direction. Given this direction, we can use the dot product between the normal and the gravity direction such that growth only occurs when they are aligned. For example, when the gravity direction is downward, the mesh will grow purely downwards when the normal is aligned.
 
 *Planar Expansion*
 
-![](img/planar.png)
+![](img/plan.gif)
 
 This expansion is similar to gravity. It takes in a specified direction, but instead of growing in that direction, we grow in the plane that is perpindicular to it. This allows for radial growth patterns based on similar dot product analysis as in gravity.
 
+![](img/plan_alt.gif)
+
 *Noise Expansion*
 
-![](img/perlin.gif)
+![](img/noise.gif)
 
 In the previous displacement types, we were able to determine displacements based on the properties at our cell. In noise expansion, we instead poll another precomputed 3D texture for displacements. This can be processed however you please, but we define these displacements as noise functions. Specifically, we use Perlin and Worley noise to guide a slightly chaotic growth pattern.
 
@@ -97,15 +103,19 @@ This deformation can be thought of as a mix between gravity and noise expansion.
 
 *Repulsion*
 
-![](img/repulsion.gif)
+![](img/rep.gif)
 
 A lot of behaviors we've seen in similar work show signs of repulsion between surfaces, so we attempted to apply this to our model as well. In order to achieve this, we use a sampling method. For each cell that represents a surface, we use hemispheric sampling in order to determine proximity to other surfaces. If the samples fall within a negative region of the SDF, the sample contributes some amound of repulsion in the opposite direction. At the moment, this causes meshes to have a tendency to "eat away at itself" if concave sections are introduced by other displacements.
 
 *Curvature Expansion*
 
-![](img/curvature.gif)
+![](img/curv.gif)
 
 As one of the more expressive displacements, we wanted to be able to deform a meshes based on the curvature at any point. We do this by defining curvature as the magnitude of change in the normal around a cell. We can provide offset values to this function in order to determine at what scale we want to assess curvature. A smaller offset will catch curvature introduced by tiny ridges while a larger offset will introduce growth based on the higher-level topology of the mesh. Upon finding the magnitude of curvature, we expand the mesh along the normals based on this magnitude, causing points of higher frequency to grow faster.
+
+A bigger curvature radius catches bigger features:
+
+![](img/curv_alt.gif)
 
 If you'd like more details on how these are implemented, feel free to check out our [displacement compute shader](https://github.com/mmerchante/organic-mesh-growth/blob/master/src/OrganicMeshGrowth/OrganicMeshGrowth/shaders/kernel.comp)!
 
